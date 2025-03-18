@@ -1,0 +1,2 @@
+In this project, I will build / train a neuron, an mlp, a simple language model, and finally a GPT model, from scratch. This is purely for learning.
+I'm fairly familiar with all this, just never actually built anything from scratch -- so I expect this to not take more than a few days.
