@@ -71,20 +71,23 @@ class UnidimensionalNeuron:
         self.learning_rate = Value(lr)
 
     def forward(self, input):
-        if not isinstance(input, (int, float)):
-            raise ValueError(f"A unidimensional neuron only supports an integer or float as input")
-        return Value(self.weight*input + self.bias)
+        if not isinstance(input, Value):
+            raise ValueError(f"A unidimensional neuron only supports a Value as an input")
+        return Value(self.weight.value*input.value + self.bias.value)
     
     def descend():
-        self.weight = self.weight - self.learning_rate*self.weight.gradient
+        self.weight.value = self.weight.value - self.learning_rate.value*self.weight.gradient.value
 
 if __name__ == "__main__":
     neuron = UnidimensionalNeuron()
     with open("data.csv", "r") as f:
         data = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
+    print(data)
     def avg_loss():
         total_loss = Value(0.0)
-        for x, y in data:
+        for pair in data:
+            x, y = pair
+            print(type(y))
             total_loss += Value(abs((neuron.forward(x) - y).value))
         return total_loss / Value(len(data))
     
