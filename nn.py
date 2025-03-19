@@ -58,29 +58,35 @@ class Value:
     def __truediv__(self, other_value):
         reciprocal = Value(1.0 / other_value.value)
         return self.__mul__(reciprocal, '/')
+
+    def __abs__(self):
+        self.op = '|'
+        return Value(self.value*-1 if self.value < 0 else self.value, [self, None])
     
     def backward(self, other_value=None, chain_rule_grad=1.0):
         if self.op == "+":
             self.gradient = 1.0*chain_rule_grad
-        if self.op == "-":
+        elif self.op == "-":
             if self.right:
                 self.gradient = -1.0*chain_rule_grad
             else:
                 self.gradient = 1.0*chain_rule_grad
-        if self.op == '*':
+        elif self.op == '*':
             self.gradient = other_value.value*chain_rule_grad
         elif self.op == '/':
             if self.right:
                 self.gradient = ((-other_value.value)/(self.value**2))*chain_rule_grad
             else:
                 self.gradient = (1 / other_value.value)*chain_rule_grad
+        elif self.op == "|":
+            self.gradient = -1.0*chain_rule_grad if self.value < 0 else 1.0*chain_rule_grad
         else: # op will be None for root node
             self.gradient = 1.0
         if not self.children:
             return
         child_1, child_2 = self.children
         child_1.backward(child_2, self.gradient)
-        child_2.backward(child_1, self.gradient)
+        child_2.backward(child_1, self.gradient) if child_2 else None
 
 class UnidimensionalNeuron:
     def __init__(self, lr = 0.025):
@@ -106,7 +112,7 @@ if __name__ == "__main__":
         total_loss = Value(0.0)
         for pair in data:
             x, y = pair
-            total_loss += Value(abs((neuron.forward(x) - y).value)) # have to reverse the abs function
+            total_loss += abs((neuron.forward(x) - y).value) # have to reverse the abs function
         return total_loss / Value(len(data))
     
     # Track average losses per epoch for visualization
@@ -121,7 +127,7 @@ if __name__ == "__main__":
         for i, pair in enumerate(data):
             x, y = pair
             prediction = neuron.forward(x)
-            loss = Value(abs((prediction - y).value), [prediction, y])
+            loss = abs((prediction - y))
             total_loss += loss.value
             
             loss.backward()
@@ -154,7 +160,6 @@ if __name__ == "__main__":
     
     # Show final model parameters
     print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
-    print(f"Final average loss: {get_avg_loss().value:.4f}")
     
     # Show the plot
     plt.tight_layout()
