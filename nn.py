@@ -1,34 +1,24 @@
 import math
 import random
-import matplotlib.pyplot as plt  # Add this import at the top
+import matplotlib.pyplot as plt
 import numpy as np
-# Could pass a running gradient or store parents in nodes -- running seems more efficient for large NNs.
+import heapq
 # Still need unit tests
-
-            # In the case of the following local derivatives
-            # add: d(z = x + y)/dx
-            # sub: d(z = x - y)/dx
-            # root: d(z)/dz
-            # the derivative is 1
-            # sub: d(z = x - y)/dy -- this is -1 since y is the right value!
-            # mul: d(z = x*y)/dx -- this is y 
-            # mul: d(z = x*y)/dy -- this is x
-            # div: d(z = x/y)/dx -- this is 1/y
-            # div: d(z = x/y)/dy -- this is d(x*y^-1)/dy -- so that's d(c*y^-1)/d -- so that's (c*-y^-2) -- that's (-c/y^2) -- (-x/y^2)
-
 # If it works, it works...
+
+# In the case of the following local derivatives
+# add: d(z = x + y)/dx
+# sub: d(z = x - y)/dx
+# root: d(z)/dz
+# the derivative is 1
+# sub: d(z = x - y)/dy -- this is -1 since y is the right value!
+# mul: d(z = x*y)/dx -- this is y 
+# mul: d(z = x*y)/dy -- this is x
+# div: d(z = x/y)/dx -- this is 1/y
+# div: d(z = x/y)/dy -- this is d(x*y^-1)/dy -- so that's d(c*y^-1)/d -- so that's (c*-y^-2) -- that's (-c/y^2) -- (-x/y^2)
+# abs: d(z = |y|)/dy -- this is d(z = -y)/dy for y < 0 and d(z = y)/dy otherwise, which is -1 and 1 respectively
+
 # Typing
-
-# Should op be the op used to create it or op that it was part of... -- should be op it was part of...
-# Which means it should be set in the function, not at time of creation.
-
-# What things should be Values? Well you need to compute the gradients backwards from the loss, so it seems like everything involved in computing the loss.
-# But then you're summing the loss for each (input, output) pair in the dataset... should descend happen on a per data point basis? it's possible...
-# I actually forget which way you did gradient descent -- yeah many variants, but let's on a per data point basis for simplicity of loss computation
-
-# Ok how is it going up after reaching 0? Om the weights are overshooting bc gradient too high
-
-# The absolute value needs to be backwardsed, the gradients should be reset after each backward pass.
 class Value:
     def __init__(self, value, children=None):
         self.value = value
@@ -65,23 +55,23 @@ class Value:
     
     def backward(self, other_value=None, chain_rule_grad=1.0):
         if self.op == "+":
-            self.gradient = 1.0*chain_rule_grad
+            self.gradient += 1.0*chain_rule_grad
         elif self.op == "-":
             if self.right:
-                self.gradient = -1.0*chain_rule_grad
+                self.gradient += -1.0*chain_rule_grad
             else:
-                self.gradient = 1.0*chain_rule_grad
+                self.gradient += 1.0*chain_rule_grad
         elif self.op == '*':
-            self.gradient = other_value.value*chain_rule_grad
+            self.gradient += other_value.value*chain_rule_grad
         elif self.op == '/':
             if self.right:
-                self.gradient = ((-other_value.value)/(self.value**2))*chain_rule_grad
+                self.gradient += ((-other_value.value)/(self.value**2))*chain_rule_grad
             else:
-                self.gradient = (1 / other_value.value)*chain_rule_grad
+                self.gradient += (1 / other_value.value)*chain_rule_grad
         elif self.op == "|":
-            self.gradient = -1.0*chain_rule_grad if self.value < 0 else 1.0*chain_rule_grad
-        else: # op will be None for root node
-            self.gradient = 1.0
+            self.gradient += -1.0*chain_rule_grad if self.value < 0 else 1.0*chain_rule_grad
+        else: # op will be None for root
+            self.gradient += 1.0
         if not self.children:
             return
         child_1, child_2 = self.children
@@ -108,16 +98,9 @@ if __name__ == "__main__":
     neuron = UnidimensionalNeuron()
     with open("data.csv", "r") as f:
         data = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
-    def get_avg_loss():
-        total_loss = Value(0.0)
-        for pair in data:
-            x, y = pair
-            total_loss += abs((neuron.forward(x) - y).value) # have to reverse the abs function
-        return total_loss / Value(len(data))
     
     # Track average losses per epoch for visualization
     epoch_losses = []
-    epoch_numbers = []
     
     epoch = 72
     for e in range(epoch):
@@ -136,15 +119,15 @@ if __name__ == "__main__":
         
         # Calculate and store average loss for this epoch
         avg_loss = total_loss / len(data)
-        epoch_losses.append(avg_loss)
-        epoch_numbers.append(e)
+        heapq.heappush(epoch_losses, (avg_loss, e))
         
         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
         print(f"avg loss: {avg_loss}")
     
+    epoch_numbers = [pair[1] for pair in epoch_losses]
     # Show average loss graph per epoch
     plt.figure(figsize=(10, 6))
-    plt.plot(epoch_numbers, epoch_losses, 'b-o')
+    plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
     plt.title('Average Loss per Epoch')
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
@@ -152,7 +135,7 @@ if __name__ == "__main__":
     
     # Add a trend line to better visualize the overall direction
     if len(epoch_losses) > 1:
-        z = np.polyfit(epoch_numbers, epoch_losses, 1)
+        z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
         p = np.poly1d(z)
         plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
                  label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
@@ -160,6 +143,8 @@ if __name__ == "__main__":
     
     # Show final model parameters
     print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
+    print(f"Final average loss: {avg_loss}, epoch={epoch}")
+    print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
     
     # Show the plot
     plt.tight_layout()
