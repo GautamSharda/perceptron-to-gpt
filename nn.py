@@ -18,7 +18,18 @@ import heapq
 # div: d(z = x/y)/dy -- this is d(x*y^-1)/dy -- so that's d(c*y^-1)/d -- so that's (c*-y^-2) -- that's (-c/y^2) -- (-x/y^2)
 # abs: d(z = |y|)/dy -- this is d(z = -y)/dy for y < 0 and d(z = y)/dy otherwise, which is -1 and 1 respectively
 
+# TODO:
 # Typing
+# Training: epoch
+# Neuron: LR variation = Adam
+# Training: SGD / BGD / Mini-Batch Gradient Descent
+# Batch size = how many examples before going backward. how large computaiton graph.
+# In batch: batch size = N --> 1 backward pass.
+# In stochastic: batch size = 1 --> N backward passes.
+# In mini-batch: N > batch size > 1.
+# Different from accumulation: this is about freq. of UPDATE WEIGHTS / epoch not freq. of GO BACKWARDS / epoch (batch size).
+# So, you want to reset gradients after an update.
+
 class Value:
     def __init__(self, value, children=None):
         self.value = value
@@ -55,23 +66,23 @@ class Value:
     
     def backward(self, other_value=None, chain_rule_grad=1.0):
         if self.op == "+":
-            self.gradient += 1.0*chain_rule_grad
+            self.gradient = 1.0*chain_rule_grad
         elif self.op == "-":
             if self.right:
-                self.gradient += -1.0*chain_rule_grad
+                self.gradient = -1.0*chain_rule_grad
             else:
-                self.gradient += 1.0*chain_rule_grad
+                self.gradient = 1.0*chain_rule_grad
         elif self.op == '*':
-            self.gradient += other_value.value*chain_rule_grad
+            self.gradient = other_value.value*chain_rule_grad
         elif self.op == '/':
             if self.right:
-                self.gradient += ((-other_value.value)/(self.value**2))*chain_rule_grad
+                self.gradient = ((-other_value.value)/(self.value**2))*chain_rule_grad
             else:
-                self.gradient += (1 / other_value.value)*chain_rule_grad
+                self.gradient = (1 / other_value.value)*chain_rule_grad
         elif self.op == "|":
-            self.gradient += -1.0*chain_rule_grad if self.value < 0 else 1.0*chain_rule_grad
+            self.gradient = -1.0*chain_rule_grad if self.value < 0 else 1.0*chain_rule_grad
         else: # op will be None for root
-            self.gradient += 1.0
+            self.gradient = 1.0
         if not self.children:
             return
         child_1, child_2 = self.children
@@ -94,59 +105,143 @@ class UnidimensionalNeuron:
         self.weight.value = self.weight.value - self.learning_rate.value*self.weight.gradient
         self.bias.value = self.bias.value - self.learning_rate.value*self.bias.gradient
 
-if __name__ == "__main__":
-    neuron = UnidimensionalNeuron()
+# if __name__ = "__main__":
+
+
+# basic
+# if __name__ == "__main__":
+#     neuron = UnidimensionalNeuron()
+#     with open("data.csv", "r") as f:
+#         data = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
+    
+#     # Track average losses per epoch for visualization
+#     epoch_losses = []
+    
+#     epoch = 72
+#     for e in range(epoch):
+#         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
+#         total_loss = 0
+        
+#         for i, pair in enumerate(data):
+#             x, y = pair
+#             prediction = neuron.forward(x)
+#             loss = abs((prediction - y))
+#             total_loss += loss.value
+            
+#             loss.backward()
+#             neuron.descend()
+#             print(f"e{e}.{i} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
+        
+#         # Calculate and store average loss for this epoch
+#         avg_loss = total_loss / len(data)
+#         heapq.heappush(epoch_losses, (avg_loss, e))
+        
+#         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
+#         print(f"avg loss: {avg_loss}")
+    
+#     epoch_numbers = [pair[1] for pair in epoch_losses]
+#     # Show average loss graph per epoch
+#     plt.figure(figsize=(10, 6))
+#     plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
+#     plt.title('Average Loss per Epoch')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Average Loss')
+#     plt.grid(True)
+    
+#     # Add a trend line to better visualize the overall direction
+#     if len(epoch_losses) > 1:
+#         z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
+#         p = np.poly1d(z)
+#         plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
+#                  label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
+#         plt.legend()
+    
+#     # Show final model parameters
+#     print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
+#     print(f"Final average loss: {avg_loss}, epoch={epoch}")
+#     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
+    
+#     # Show the plot
+#     plt.tight_layout()
+#     plt.show()
+
+
+# multiple neurons
+if __name__ == '__main__':
+    # Create multiple neurons with different learning rates
+    learning_rates = [0.001, 0.01, 0.025, 0.05, 0.1]
+    neurons = [UnidimensionalNeuron(lr=lr) for lr in learning_rates]
+    
     with open("data.csv", "r") as f:
         data = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
     
-    # Track average losses per epoch for visualization
-    epoch_losses = []
+    # Track average losses per epoch for each neuron
+    all_epoch_losses = [[] for _ in learning_rates]
     
-    epoch = 72
-    for e in range(epoch):
-        print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        total_loss = 0
+    epochs = 72
+    for e in range(epochs):
+        print(f"Epoch {e}")
         
-        for i, pair in enumerate(data):
-            x, y = pair
-            prediction = neuron.forward(x)
-            loss = abs((prediction - y))
-            total_loss += loss.value
+        # Train each neuron and track losses
+        for i, neuron in enumerate(neurons):
+            total_loss = 0
             
-            loss.backward()
-            neuron.descend()
-            print(f"e{e}.{i} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        
-        # Calculate and store average loss for this epoch
-        avg_loss = total_loss / len(data)
-        heapq.heappush(epoch_losses, (avg_loss, e))
-        
-        print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        print(f"avg loss: {avg_loss}")
+            for j, pair in enumerate(data):
+                x, y = pair
+                prediction = neuron.forward(x)
+                loss = abs(prediction - y)
+                total_loss += loss.value
+                
+                loss.backward()
+                neuron.descend()
+            
+            # Calculate and store average loss for this epoch
+            avg_loss = total_loss / len(data)
+            heapq.heappush(all_epoch_losses[i], (avg_loss, e))
+            
+            print(f"  LR={learning_rates[i]}: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}, avg_loss={avg_loss:.4f}")
+
+    # Visualization
+    plt.figure(figsize=(12, 8))
     
-    epoch_numbers = [pair[1] for pair in epoch_losses]
-    # Show average loss graph per epoch
-    plt.figure(figsize=(10, 6))
-    plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
-    plt.title('Average Loss per Epoch')
+    # Plot loss curves for each learning rate
+    for i, lr in enumerate(learning_rates):
+        # Extract epoch numbers and losses in order
+        sorted_losses = sorted(all_epoch_losses[i], key=lambda x: x[1])  # Sort by epoch number
+        epoch_numbers = [pair[1] for pair in sorted_losses]
+        losses = [pair[0] for pair in sorted_losses]
+        
+        plt.plot(epoch_numbers, losses, '-o', label=f'LR={lr}', alpha=0.7)
+    
+    plt.title('Average Loss per Epoch for Different Learning Rates')
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
     plt.grid(True)
+    plt.legend()
     
-    # Add a trend line to better visualize the overall direction
-    if len(epoch_losses) > 1:
-        z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
-        p = np.poly1d(z)
-        plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
-                 label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
-        plt.legend()
+    # Print final results for each learning rate
+    print("\nFinal Results:")
+    for i, lr in enumerate(learning_rates):
+        best_loss = all_epoch_losses[i][0][0]
+        best_epoch = all_epoch_losses[i][0][1]
+        print(f"LR={lr}: Best loss={best_loss:.4f} at epoch {best_epoch}")
+        print(f"  Final parameters: weight={neurons[i].weight.value:.4f}, bias={neurons[i].bias.value:.4f}")
     
-    # Show final model parameters
-    print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
-    print(f"Final average loss: {avg_loss}, epoch={epoch}")
-    print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
+    # Plot the learned functions
+    plt.figure(figsize=(10, 6))
+    x_values = np.linspace(0, 10, 100)
+    plt.plot(x_values, x_values, 'k--', label='True function: f(x) = x')
+
+    for i, lr in enumerate(learning_rates):
+        y_values = [neurons[i].weight.value * x + neurons[i].bias.value for x in x_values]
+        plt.plot(x_values, y_values, label=f'LR={lr}: y = {neurons[i].weight.value:.4f}x + {neurons[i].bias.value:.4f}')
     
-    # Show the plot
+    plt.title('Learned Functions for Different Learning Rates')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.legend()
+    
     plt.tight_layout()
     plt.show()
     
