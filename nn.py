@@ -144,7 +144,6 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
             if batches_processed % accumulate == 0:
                 neuron.descend()
         
-        # Calculate and store average loss for this epoch
         avg_loss = epoch_loss / len(batches)
         heapq.heappush(epoch_losses, (avg_loss, e))
         
@@ -184,7 +183,6 @@ def plot_unidimensional_neuron_training(results_list, labels=None, colors=None):
     # Plot 1: Loss curves
     plt.figure(figsize=(12, 8))
     
-    # Plot each loss curve
     for i, result in enumerate(results_list):
         epoch_losses = result['epoch_losses']
         # Sort by epoch number if using a heap
@@ -233,7 +231,6 @@ def plot_unidimensional_neuron_training(results_list, labels=None, colors=None):
     plt.grid(True)
     plt.legend()
     
-    # Print summary table
     print("\nSummary of Results:")
     print("-" * 80)
     print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
@@ -247,9 +244,6 @@ def plot_unidimensional_neuron_training(results_list, labels=None, colors=None):
     
     plt.tight_layout()
     plt.show()
-
-# Impl SGD, BGD, MBGD, with accumulation and non-accumulation for each -- that's 6 NNs in total.
-# Same dataset size, epochs, and learning rates.
 
 if __name__ == "__main__":
     EPOCHS = 72
