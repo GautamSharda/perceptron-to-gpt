@@ -188,8 +188,6 @@ if __name__ == "__main__":
 
     # BGD
     bgd = UnidimensionalNeuron()
-    EPOCHS = 72
-    DATASET = "data.csv"
     # train_unidimensional_neuron(bgd, DATASET, EPOCHS, batch_size=10)
 
     # MBGD
