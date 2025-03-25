@@ -22,6 +22,8 @@ import heapq
 # Order matters in batch processing -- it's worth asking why small to large / preserving order in this case works
 # Also worth switching to randomly sampled batches
 # And noting that accumulation tends to work better
+# Bigger batch, bigger loss... duh, they all converge to the same weights and bias
+# Include learning rates in plots
 # Neuron: LR variation = Adam
 # Training: SGD / BGD / Mini-Batch Gradient Descent
 # Batch size = how many examples before going backward. how large computaiton graph.
@@ -163,37 +165,86 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
         'epochs': epochs
     }
 
-def plot_unidimensional_neuron_training(training_results):
-    epoch_losses = training_results['epoch_losses']
-    final_weight = training_results['final_weight']
-    final_bias = training_results['final_bias']
-    final_avg_loss = training_results['final_avg_loss']
-    best_epoch = training_results['best_epoch']
-    epochs = training_results['epochs']
+def plot_unidimensional_neuron_training(results_list, labels=None, colors=None):
+    """
+    Plot multiple training results on the same graphs.
     
-    epoch_numbers = [pair[1] for pair in epoch_losses]
-    # Show average loss graph per epoch
-    plt.figure(figsize=(10, 6))
-    plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
+    Args:
+        results_list: List of dictionaries, each containing training results
+                     Each dict should have: 'epoch_losses', 'final_weight', 'final_bias', 'final_loss'
+        labels: List of labels for each result set
+        colors: List of colors for each result set
+    """
+    if labels is None:
+        labels = [f"Model {i+1}" for i in range(len(results_list))]
+    
+    if colors is None:
+        colors = plt.cm.tab10(np.linspace(0, 1, len(results_list)))
+    
+    # Plot 1: Loss curves
+    plt.figure(figsize=(12, 8))
+    
+    # Plot each loss curve
+    for i, result in enumerate(results_list):
+        epoch_losses = result['epoch_losses']
+        # Sort by epoch number if using a heap
+        sorted_losses = sorted(epoch_losses, key=lambda x: x[1])
+        epoch_numbers = [pair[1] for pair in sorted_losses]
+        losses = [pair[0] for pair in sorted_losses]
+        
+        plt.plot(epoch_numbers, losses, '-o', color=colors[i], label=labels[i], alpha=0.7)
+    
     plt.title('Average Loss per Epoch')
     plt.xlabel('Epoch')
     plt.ylabel('Average Loss')
     plt.grid(True)
+    plt.legend()
     
-    # Add a trend line to better visualize the overall direction
-    if len(epoch_losses) > 1:
-        z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
-        p = np.poly1d(z)
-        plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
-                 label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
-        plt.legend()
+    # Add trend lines
+    for i, result in enumerate(results_list):
+        epoch_losses = result['epoch_losses']
+        sorted_losses = sorted(epoch_losses, key=lambda x: x[1])
+        epoch_numbers = [pair[1] for pair in sorted_losses]
+        losses = [pair[0] for pair in sorted_losses]
+        
+        if len(epoch_numbers) > 1:
+            z = np.polyfit(epoch_numbers, losses, 1)
+            p = np.poly1d(z)
+            plt.plot(epoch_numbers, p(epoch_numbers), "--", color=colors[i], alpha=0.5,
+                    label=f"{labels[i]} Trend: {z[0]:.6f}x + {z[1]:.6f}")
     
-    # Show final model parameters
-    print(f"Final model parameters: weight={final_weight:.4f}, bias={final_bias:.4f}")
-    print(f"Final average loss: {final_avg_loss}, epoch={epochs}")
-    print(f"Best average loss: {epoch_losses[0][0]}, epoch={best_epoch}")
+    plt.legend()
     
-    # Show the plot
+    # Plot 2: Learned functions
+    plt.figure(figsize=(10, 6))
+    x_values = np.linspace(0, 10, 100)
+    plt.plot(x_values, x_values, 'k--', label='True function: f(x) = x')
+    
+    for i, result in enumerate(results_list):
+        weight = result['final_weight']
+        bias = result['final_bias']
+        y_values = [weight * x + bias for x in x_values]
+        plt.plot(x_values, y_values, color=colors[i], 
+                label=f"{labels[i]}: y = {weight:.4f}x + {bias:.4f}")
+    
+    plt.title('Learned Functions')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.legend()
+    
+    # Print summary table
+    print("\nSummary of Results:")
+    print("-" * 80)
+    print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
+    print("-" * 80)
+    
+    for i, result in enumerate(results_list):
+        best_loss = min(result['epoch_losses'], key=lambda x: x[0])[0]
+        best_epoch = min(result['epoch_losses'], key=lambda x: x[0])[1]
+        print(f"{labels[i]:<15} {result['final_weight']:<15.4f} {result['final_bias']:<15.4f} "
+              f"{result['final_avg_loss']:<15.4f} {best_loss:<15.4f} (e{best_epoch})")
+    
     plt.tight_layout()
     plt.show()
 
@@ -203,108 +254,37 @@ def plot_unidimensional_neuron_training(training_results):
 if __name__ == "__main__":
     EPOCHS = 72
     DATASET = "data.csv"
+    labels = []
 
     # SGD
     sgd = UnidimensionalNeuron()
-    results = train_unidimensional_neuron(neuron=sgd, dataset=DATASET, epochs=EPOCHS, batch_size=1)
-    plot_unidimensional_neuron_training(results)
+    result = train_unidimensional_neuron(neuron=sgd, dataset=DATASET, epochs=EPOCHS, batch_size=1)
+    labels.append("sgd")
 
     # BGD
     bgd = UnidimensionalNeuron()
-    # train_unidimensional_neuron(bgd, DATASET, EPOCHS, batch_size=10)
+    result_two = train_unidimensional_neuron(bgd, DATASET, EPOCHS, batch_size=10)
+    labels.append("bgd")
 
     # MBGD
     mbgd = UnidimensionalNeuron()
-    # train_unidimensional_neuron(mbgd, DATASET, EPOCHS, batch_size=3)
+    results_three = train_unidimensional_neuron(mbgd, DATASET, EPOCHS, batch_size=3)
+    labels.append("mbgd")
 
     # SGD Acc
     sgd_acc = UnidimensionalNeuron()
-    # train_unidimensional_neuron(sgd_acc, DATASET, EPOCHS, batch_size=1, accumulate=10)
+    results_four = train_unidimensional_neuron(sgd_acc, DATASET, EPOCHS, batch_size=1, accumulate=10)
+    labels.append("sgd_acc")
 
     # BGD Acc
     bgd_acc = UnidimensionalNeuron()
-    # train_unidimensional_neuron(bgd_acc, DATASET, EPOCHS, batch_size=10, accumulate=1)
+    results_five = train_unidimensional_neuron(bgd_acc, DATASET, EPOCHS, batch_size=10, accumulate=1)
+    labels.append("bgd_acc")
 
     # MBGD_ACC
     mbgd_acc = UnidimensionalNeuron()
-    # train_unidimensional_neuron(mbgd_acc, DATASET, EPOCHS, batch_size=3, accumulate=2)
+    results_six = train_unidimensional_neuron(mbgd_acc, DATASET, EPOCHS, batch_size=3, accumulate=2)
+    labels.append("mbgd_acc")
 
-# multiple neurons
-# if __name__ == '__main__':
-#     # Create multiple neurons with different learning rates
-#     learning_rates = [0.001, 0.01, 0.025, 0.05, 0.1]
-#     neurons = [UnidimensionalNeuron(lr=lr) for lr in learning_rates]
-    
-#     with open("data.csv", "r") as f:
-#         data = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
-    
-#     # Track average losses per epoch for each neuron
-#     all_epoch_losses = [[] for _ in learning_rates]
-    
-#     epochs = 72
-#     for e in range(epochs):
-#         print(f"Epoch {e}")
-        
-#         # Train each neuron and track losses
-#         for i, neuron in enumerate(neurons):
-#             total_loss = 0
-            
-#             for j, pair in enumerate(data):
-#                 x, y = pair
-#                 prediction = neuron.forward(x)
-#                 loss = abs(prediction - y)
-#                 total_loss += loss.value
-                
-#                 loss.backward()
-#                 neuron.descend()
-            
-#             # Calculate and store average loss for this epoch
-#             avg_loss = total_loss / len(data)
-#             heapq.heappush(all_epoch_losses[i], (avg_loss, e))
-            
-#             print(f"  LR={learning_rates[i]}: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}, avg_loss={avg_loss:.4f}")
-
-#     # Visualization
-#     plt.figure(figsize=(12, 8))
-    
-#     # Plot loss curves for each learning rate
-#     for i, lr in enumerate(learning_rates):
-#         # Extract epoch numbers and losses in order
-#         sorted_losses = sorted(all_epoch_losses[i], key=lambda x: x[1])  # Sort by epoch number
-#         epoch_numbers = [pair[1] for pair in sorted_losses]
-#         losses = [pair[0] for pair in sorted_losses]
-        
-#         plt.plot(epoch_numbers, losses, '-o', label=f'LR={lr}', alpha=0.7)
-    
-#     plt.title('Average Loss per Epoch for Different Learning Rates')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Average Loss')
-#     plt.grid(True)
-#     plt.legend()
-    
-#     # Print final results for each learning rate
-#     print("\nFinal Results:")
-#     for i, lr in enumerate(learning_rates):
-#         best_loss = all_epoch_losses[i][0][0]
-#         best_epoch = all_epoch_losses[i][0][1]
-#         print(f"LR={lr}: Best loss={best_loss:.4f} at epoch {best_epoch}")
-#         print(f"  Final parameters: weight={neurons[i].weight.value:.4f}, bias={neurons[i].bias.value:.4f}")
-    
-#     # Plot the learned functions
-#     plt.figure(figsize=(10, 6))
-#     x_values = np.linspace(0, 10, 100)
-#     plt.plot(x_values, x_values, 'k--', label='True function: f(x) = x')
-
-#     for i, lr in enumerate(learning_rates):
-#         y_values = [neurons[i].weight.value * x + neurons[i].bias.value for x in x_values]
-#         plt.plot(x_values, y_values, label=f'LR={lr}: y = {neurons[i].weight.value:.4f}x + {neurons[i].bias.value:.4f}')
-    
-#     plt.title('Learned Functions for Different Learning Rates')
-#     plt.xlabel('x')
-#     plt.ylabel('y')
-#     plt.grid(True)
-#     plt.legend()
-    
-#     plt.tight_layout()
-#     plt.show()
+    plot_unidimensional_neuron_training([result, result_two, results_three, results_four, results_five, results_six], labels)
     
