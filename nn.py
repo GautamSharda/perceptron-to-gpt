@@ -19,8 +19,8 @@ import heapq
 # TODO:
 # Unit Tests
 # Typing
-# Training: epoch
-# Order matters in batch processing
+# Order matters in batch processing -- it's worth asking why small to large / preserving order in this case works
+# Also worth switching to randomly sampled batches
 # Neuron: LR variation = Adam
 # Training: SGD / BGD / Mini-Batch Gradient Descent
 # Batch size = how many examples before going backward. how large computaiton graph.
@@ -109,132 +109,43 @@ class UnidimensionalNeuron:
         self.weight.gradient = 0
         self.bias.gradient = 0
 
-class GDTrainer:
-    def __init__(neuron, dataset):
-        self.neuron = neuron
-        self.dataset = dataset
-    
-    def train(epochs, batch_size, accumulate):
-
-# Impl SGD, BGD, MBGD, with accumulation and non-accumulation for each -- that's 6 NNs in total.
-# Same dataset size, epochs, and learning rates.
-
-# SGD
-# if __name__ == "__main__":
-#     sgd_non_acc = UnidimensionalNeuron()
-#     EPOCHS = 72
-#     with open("data.csv", "r") as f: # N = 10
-#         dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
-
-#     BATCH_SIZE = 1.0
-#     batches = []
-#     while dataset:
-#         batch = []
-#         for i in range(int(BATCH_SIZE)):
-#             if dataset:
-#                 example = dataset.pop()
-#                 batch.append(example)
-#         batches.append(batch)
-#     # Reverse the batches to process them in the original data order
-#     batches = batches[::-1]
-    
-#     # Track average losses per epoch for visualization
-#     epoch_losses = []
-    
-#     for e in range(EPOCHS):
-#         print(f"e{e} -- weight: {sgd_non_acc.weight.value}, bias: {sgd_non_acc.bias.value}")
-#         epoch_loss = 0
-        
-#         for batch in batches:
-#             total_batch_loss = Value(0.0)
-#             for example in batch:
-#                 x, y = example
-#                 prediction = sgd_non_acc.forward(x)
-#                 loss = abs((prediction - y))
-#                 total_batch_loss += loss
-#                 epoch_loss += loss.value
-            
-#             avg_batch_loss = total_batch_loss / Value(BATCH_SIZE)
-#             avg_batch_loss.backward()
-#             # no gradient accumulation
-#             sgd_non_acc.descend()
-        
-#         # Calculate and store average loss for this epoch
-#         avg_loss = epoch_loss / len(batches)
-#         heapq.heappush(epoch_losses, (avg_loss, e))
-        
-#         print(f"e{e} -- weight: {sgd_non_acc.weight.value}, bias: {sgd_non_acc.bias.value}")
-#         print(f"avg loss: {avg_loss}")
-    
-#     epoch_numbers = [pair[1] for pair in epoch_losses]
-#     # Show average loss graph per epoch
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
-#     plt.title('Average Loss per Epoch')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Average Loss')
-#     plt.grid(True)
-    
-#     # Add a trend line to better visualize the overall direction
-#     if len(epoch_losses) > 1:
-#         z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
-#         p = np.poly1d(z)
-#         plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
-#                  label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
-#         plt.legend()
-    
-#     # Show final model parameters
-#     print(f"Final model parameters: weight={sgd_non_acc.weight.value:.4f}, bias={sgd_non_acc.bias.value:.4f}")
-#     print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
-#     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
-    
-#     # Show the plot
-#     plt.tight_layout()
-#     plt.show()
-
-# BGD
-if __name__ == "__main__":
-    bgd_non_acc = UnidimensionalNeuron()
-    EPOCHS = 72
-    with open("data.csv", "r") as f: # N = 10
+def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=1):
+    with open(dataset, "r") as f:
         dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
-
-    BATCH_SIZE = len(dataset) # DIFF
     batches = []
     while dataset:
         batch = []
-        for i in range(BATCH_SIZE):
+        for i in range(batch_size):
             if dataset:
                 example = dataset.pop()
                 batch.append(example)
         batches.append(batch)
     
-    # Track average losses per epoch for visualization
     epoch_losses = []
-    
-    for e in range(EPOCHS):
-        print(f"e{e} -- weight: {bgd_non_acc.weight.value}, bias: {bgd_non_acc.bias.value}")
+    for e in range(epochs):
+        print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
         epoch_loss = 0
-        
+        batches_processed = 0
         for batch in batches:
             total_batch_loss = Value(0.0)
             for example in batch:
                 x, y = example
-                prediction = bgd_non_acc.forward(x)
+                prediction = neuron.forward(x)
                 loss = abs((prediction - y))
                 total_batch_loss += loss
                 epoch_loss += loss.value
             
-            avg_batch_loss = total_batch_loss / Value(BATCH_SIZE)
+            avg_batch_loss = total_batch_loss / Value(batch_size)
             avg_batch_loss.backward()
-            # no gradient accumulation
-            bgd_non_acc.descend()
+            batches_processed += 1
+            if batches_processed % accumulate == 0:
+                neuron.descend()
         
         # Calculate and store average loss for this epoch
         avg_loss = epoch_loss / len(batches)
         heapq.heappush(epoch_losses, (avg_loss, e))
         
-        print(f"e{e} -- weight: {bgd_non_acc.weight.value}, bias: {bgd_non_acc.bias.value}")
+        print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
         print(f"avg loss: {avg_loss}")
     
     epoch_numbers = [pair[1] for pair in epoch_losses]
@@ -255,13 +166,104 @@ if __name__ == "__main__":
         plt.legend()
     
     # Show final model parameters
-    print(f"Final model parameters: weight={bgd_non_acc.weight.value:.4f}, bias={bgd_non_acc.bias.value:.4f}")
-    print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
+    print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
+    print(f"Final average loss: {avg_loss}, epoch={epochs}")
     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
     
     # Show the plot
     plt.tight_layout()
     plt.show()
+
+# Impl SGD, BGD, MBGD, with accumulation and non-accumulation for each -- that's 6 NNs in total.
+# Same dataset size, epochs, and learning rates.
+
+if __name__ == "__main__":
+#     # MBGD_ACC
+#     mbgd_acc = UnidimensionalNeuron()
+#     EPOCHS = 72
+#     DATASET = "data.csv"
+#     BATCH_SIZE = 3
+#     ACCUM = 2
+#     train_unidimensional_neuron(mbgd_acc, DATASET, EPOCHS, BATCH_SIZE, ACCUM)
+
+    # # SGD
+    # sgd = UnidimensionalNeuron()
+    # EPOCHS = 72
+    # DATASET = "data.csv"
+    # BATCH_SIZE = 1
+    # train_unidimensional_neuron(sgd, DATASET, EPOCHS, BATCH_SIZE)
+
+
+# BGD
+# if __name__ == "__main__":
+#     bgd_non_acc = UnidimensionalNeuron()
+#     EPOCHS = 72
+#     with open("data.csv", "r") as f: # N = 10
+#         dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
+
+#     BATCH_SIZE = len(dataset) # DIFF
+#     batches = []
+#     while dataset:
+#         batch = []
+#         for i in range(BATCH_SIZE):
+#             if dataset:
+#                 example = dataset.pop()
+#                 batch.append(example)
+#         batches.append(batch)
+    
+#     # Track average losses per epoch for visualization
+#     epoch_losses = []
+    
+#     for e in range(EPOCHS):
+#         print(f"e{e} -- weight: {bgd_non_acc.weight.value}, bias: {bgd_non_acc.bias.value}")
+#         epoch_loss = 0
+        
+#         for batch in batches:
+#             total_batch_loss = Value(0.0)
+#             for example in batch:
+#                 x, y = example
+#                 prediction = bgd_non_acc.forward(x)
+#                 loss = abs((prediction - y))
+#                 total_batch_loss += loss
+#                 epoch_loss += loss.value
+            
+#             avg_batch_loss = total_batch_loss / Value(BATCH_SIZE)
+#             avg_batch_loss.backward()
+#             # no gradient accumulation
+#             bgd_non_acc.descend()
+        
+#         # Calculate and store average loss for this epoch
+#         avg_loss = epoch_loss / len(batches)
+#         heapq.heappush(epoch_losses, (avg_loss, e))
+        
+#         print(f"e{e} -- weight: {bgd_non_acc.weight.value}, bias: {bgd_non_acc.bias.value}")
+#         print(f"avg loss: {avg_loss}")
+    
+#     epoch_numbers = [pair[1] for pair in epoch_losses]
+#     # Show average loss graph per epoch
+#     plt.figure(figsize=(10, 6))
+#     plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
+#     plt.title('Average Loss per Epoch')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Average Loss')
+#     plt.grid(True)
+    
+#     # Add a trend line to better visualize the overall direction
+#     if len(epoch_losses) > 1:
+#         z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
+#         p = np.poly1d(z)
+#         plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
+#                  label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
+#         plt.legend()
+    
+#     # Show final model parameters
+#     print(f"Final model parameters: weight={bgd_non_acc.weight.value:.4f}, bias={bgd_non_acc.bias.value:.4f}")
+#     print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
+#     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
+    
+#     # Show the plot
+#     plt.tight_layout()
+#     plt.show()
 
 # MBGD
 # if __name__ == "__main__":
@@ -335,78 +337,78 @@ if __name__ == "__main__":
 #     plt.show()
 
 # SGD Acc
-if __name__ == "__main__":
-    sgd_non_acc = UnidimensionalNeuron()
-    EPOCHS = 72
-    with open("data.csv", "r") as f: # N = 10
-        dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
+# if __name__ == "__main__":
+    # sgd_non_acc = UnidimensionalNeuron()
+    # EPOCHS = 72
+    # with open("data.csv", "r") as f: # N = 10
+    #     dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
 
-    BATCH_SIZE = 1
-    ACCUM = len(dataset) // (BATCH_SIZE)
-    batches = []
-    while dataset:
-        batch = []
-        for i in range(BATCH_SIZE):
-            if dataset:
-                example = dataset.pop()
-                batch.append(example)
-        batches.append(batch)
+    # BATCH_SIZE = 1
+    # ACCUM = len(dataset) // (BATCH_SIZE)
+    # batches = []
+    # while dataset:
+    #     batch = []
+    #     for i in range(BATCH_SIZE):
+    #         if dataset:
+    #             example = dataset.pop()
+    #             batch.append(example)
+    #     batches.append(batch)
     
-    # Track average losses per epoch for visualization
-    epoch_losses = []
+    # # Track average losses per epoch for visualization
+    # epoch_losses = []
     
-    for e in range(EPOCHS):
-        print(f"e{e} -- weight: {sgd_non_acc.weight.value}, bias: {sgd_non_acc.bias.value}")
-        epoch_loss = 0
-        batches_processed = 0 # DIFF
-        for batch in batches:
-            total_batch_loss = Value(0.0)
-            for example in batch:
-                x, y = example
-                prediction = sgd_non_acc.forward(x)
-                loss = abs((prediction - y))
-                total_batch_loss += loss
-                epoch_loss += loss.value
+    # for e in range(EPOCHS):
+    #     print(f"e{e} -- weight: {sgd_non_acc.weight.value}, bias: {sgd_non_acc.bias.value}")
+    #     epoch_loss = 0
+    #     batches_processed = 0 # DIFF
+    #     for batch in batches:
+    #         total_batch_loss = Value(0.0)
+    #         for example in batch:
+    #             x, y = example
+    #             prediction = sgd_non_acc.forward(x)
+    #             loss = abs((prediction - y))
+    #             total_batch_loss += loss
+    #             epoch_loss += loss.value
             
-            avg_batch_loss = total_batch_loss / Value(BATCH_SIZE)
-            avg_batch_loss.backward()
-            batches_processed += 1  # DIFF
-            # gradient accumulation, go backwards ACCUM times (i.e., process ACCUM batches) before update
-            if batches_processed % ACCUM == 0: # DIFF
-                sgd_non_acc.descend()
+    #         avg_batch_loss = total_batch_loss / Value(BATCH_SIZE)
+    #         avg_batch_loss.backward()
+    #         batches_processed += 1  # DIFF
+    #         # gradient accumulation, go backwards ACCUM times (i.e., process ACCUM batches) before update
+    #         if batches_processed % ACCUM == 0: # DIFF
+    #             sgd_non_acc.descend()
         
-        # Calculate and store average loss for this epoch
-        avg_loss = epoch_loss / len(batches)
-        heapq.heappush(epoch_losses, (avg_loss, e))
+    #     # Calculate and store average loss for this epoch
+    #     avg_loss = epoch_loss / len(batches)
+    #     heapq.heappush(epoch_losses, (avg_loss, e))
         
-        print(f"e{e} -- weight: {sgd_non_acc.weight.value}, bias: {sgd_non_acc.bias.value}")
-        print(f"avg loss: {avg_loss}")
+    #     print(f"e{e} -- weight: {sgd_non_acc.weight.value}, bias: {sgd_non_acc.bias.value}")
+    #     print(f"avg loss: {avg_loss}")
     
-    epoch_numbers = [pair[1] for pair in epoch_losses]
-    # Show average loss graph per epoch
-    plt.figure(figsize=(10, 6))
-    plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
-    plt.title('Average Loss per Epoch')
-    plt.xlabel('Epoch')
-    plt.ylabel('Average Loss')
-    plt.grid(True)
+    # epoch_numbers = [pair[1] for pair in epoch_losses]
+    # # Show average loss graph per epoch
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
+    # plt.title('Average Loss per Epoch')
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Average Loss')
+    # plt.grid(True)
     
-    # Add a trend line to better visualize the overall direction
-    if len(epoch_losses) > 1:
-        z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
-        p = np.poly1d(z)
-        plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
-                 label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
-        plt.legend()
+    # # Add a trend line to better visualize the overall direction
+    # if len(epoch_losses) > 1:
+    #     z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
+    #     p = np.poly1d(z)
+    #     plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
+    #              label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
+    #     plt.legend()
     
-    # Show final model parameters
-    print(f"Final model parameters: weight={sgd_non_acc.weight.value:.4f}, bias={sgd_non_acc.bias.value:.4f}")
-    print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
-    print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
+    # # Show final model parameters
+    # print(f"Final model parameters: weight={sgd_non_acc.weight.value:.4f}, bias={sgd_non_acc.bias.value:.4f}")
+    # print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
+    # print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
     
-    # Show the plot
-    plt.tight_layout()
-    plt.show()
+    # # Show the plot
+    # plt.tight_layout()
+    # plt.show()
 
 
 # BGD Acc
@@ -477,136 +479,6 @@ if __name__ == "__main__":
 #     # Show final model parameters
 #     print(f"Final model parameters: weight={sgd_non_acc.weight.value:.4f}, bias={sgd_non_acc.bias.value:.4f}")
 #     print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
-#     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
-    
-#     # Show the plot
-#     plt.tight_layout()
-#     plt.show()
-
-
-# MBGD acc
-# if __name__ == "__main__":
-#     mbgd_non_acc = UnidimensionalNeuron()
-#     EPOCHS = 72*3
-#     with open("data.csv", "r") as f: # N = 10
-#         dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
-
-#     BATCH_SIZE = 3 # DIFF
-#     ACCUM = 2 # DIFF
-#     batches = []
-#     while dataset:
-#         batch = []
-#         for i in range(BATCH_SIZE):
-#             if dataset:
-#                 example = dataset.pop()
-#                 batch.append(example)
-#         batches.append(batch)
-    
-#     # Track average losses per epoch for visualization
-#     epoch_losses = []
-#     for e in range(EPOCHS):
-#         print(f"e{e} -- weight: {mbgd_non_acc.weight.value}, bias: {mbgd_non_acc.bias.value}")
-#         epoch_loss = 0
-#         batches_processed = 0 # DIFF
-#         for batch in batches:
-#             total_batch_loss = Value(0.0)
-#             for example in batch:
-#                 x, y = example
-#                 prediction = mbgd_non_acc.forward(x)
-#                 loss = abs((prediction - y))
-#                 total_batch_loss += loss
-#                 epoch_loss += loss.value
-            
-#             avg_batch_loss = total_batch_loss / Value(BATCH_SIZE)
-#             avg_batch_loss.backward()
-#             batches_processed += 1  # DIFF
-#             if batches_processed % ACCUM == 0: # DIFF
-#                 mbgd_non_acc.descend()
-        
-#         # Calculate and store average loss for this epoch
-#         avg_loss = epoch_loss / len(batches)
-#         heapq.heappush(epoch_losses, (avg_loss, e))
-        
-#         print(f"e{e} -- weight: {mbgd_non_acc.weight.value}, bias: {mbgd_non_acc.bias.value}")
-#         print(f"avg loss: {avg_loss}")
-    
-#     epoch_numbers = [pair[1] for pair in epoch_losses]
-#     # Show average loss graph per epoch
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
-#     plt.title('Average Loss per Epoch')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Average Loss')
-#     plt.grid(True)
-    
-#     # Add a trend line to better visualize the overall direction
-#     if len(epoch_losses) > 1:
-#         z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
-#         p = np.poly1d(z)
-#         plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
-#                  label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
-#         plt.legend()
-    
-#     # Show final model parameters
-#     print(f"Final model parameters: weight={mbgd_non_acc.weight.value:.4f}, bias={mbgd_non_acc.bias.value:.4f}")
-#     print(f"Final average loss: {avg_loss}, epoch={EPOCHS}")
-#     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
-    
-#     # Show the plot
-#     plt.tight_layout()
-#     plt.show()
-
-# basic
-# if __name__ == "__main__":
-#     neuron = UnidimensionalNeuron()
-#     with open("data.csv", "r") as f:
-#         data = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
-    
-#     # Track average losses per epoch for visualization
-#     epoch_losses = []
-    
-#     epoch = 72
-#     for e in range(epoch):
-#         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-#         total_loss = 0
-        
-#         for i, pair in enumerate(data):
-#             x, y = pair
-#             prediction = neuron.forward(x)
-#             loss = abs((prediction - y))
-#             total_loss += loss.value
-            
-#             loss.backward()
-#             neuron.descend()
-#             print(f"e{e}.{i} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        
-#         # Calculate and store average loss for this epoch
-#         avg_loss = total_loss / len(data)
-#         heapq.heappush(epoch_losses, (avg_loss, e))
-        
-#         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-#         print(f"avg loss: {avg_loss}")
-    
-#     epoch_numbers = [pair[1] for pair in epoch_losses]
-#     # Show average loss graph per epoch
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(epoch_numbers, [pair[0] for pair in epoch_losses], 'b-o')
-#     plt.title('Average Loss per Epoch')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Average Loss')
-#     plt.grid(True)
-    
-#     # Add a trend line to better visualize the overall direction
-#     if len(epoch_losses) > 1:
-#         z = np.polyfit(epoch_numbers, [pair[0] for pair in epoch_losses], 1)
-#         p = np.poly1d(z)
-#         plt.plot(epoch_numbers, p(epoch_numbers), "r--", alpha=0.7, 
-#                  label=f"Trend: {z[0]:.6f}x + {z[1]:.6f}")
-#         plt.legend()
-    
-#     # Show final model parameters
-#     print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
-#     print(f"Final average loss: {avg_loss}, epoch={epoch}")
 #     print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
     
 #     # Show the plot
