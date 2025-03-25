@@ -256,32 +256,26 @@ if __name__ == "__main__":
     DATASET = "data.csv"
     labels = []
 
-    # SGD
     sgd = UnidimensionalNeuron()
     result = train_unidimensional_neuron(neuron=sgd, dataset=DATASET, epochs=EPOCHS, batch_size=1)
     labels.append("sgd")
 
-    # BGD
     bgd = UnidimensionalNeuron()
     result_two = train_unidimensional_neuron(bgd, DATASET, EPOCHS, batch_size=10)
     labels.append("bgd")
 
-    # MBGD
     mbgd = UnidimensionalNeuron()
     results_three = train_unidimensional_neuron(mbgd, DATASET, EPOCHS, batch_size=3)
     labels.append("mbgd")
 
-    # SGD Acc
     sgd_acc = UnidimensionalNeuron()
     results_four = train_unidimensional_neuron(sgd_acc, DATASET, EPOCHS, batch_size=1, accumulate=10)
     labels.append("sgd_acc")
 
-    # BGD Acc
     bgd_acc = UnidimensionalNeuron()
     results_five = train_unidimensional_neuron(bgd_acc, DATASET, EPOCHS, batch_size=10, accumulate=1)
     labels.append("bgd_acc")
 
-    # MBGD_ACC
     mbgd_acc = UnidimensionalNeuron()
     results_six = train_unidimensional_neuron(mbgd_acc, DATASET, EPOCHS, batch_size=3, accumulate=2)
     labels.append("mbgd_acc")
