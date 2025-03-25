@@ -149,6 +149,28 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
         print(f"avg loss: {avg_loss}")
     
+    final_weight = neuron.weight.value
+    final_bias = neuron.bias.value
+    final_avg_loss = epoch_losses[0][0]
+    best_epoch = epoch_losses[0][1]
+    
+    return {
+        'epoch_losses': epoch_losses,
+        'final_weight': final_weight,
+        'final_bias': final_bias,
+        'final_avg_loss': final_avg_loss,
+        'best_epoch': best_epoch,
+        'epochs': epochs
+    }
+
+def plot_unidimensional_neuron_training(training_results):
+    epoch_losses = training_results['epoch_losses']
+    final_weight = training_results['final_weight']
+    final_bias = training_results['final_bias']
+    final_avg_loss = training_results['final_avg_loss']
+    best_epoch = training_results['best_epoch']
+    epochs = training_results['epochs']
+    
     epoch_numbers = [pair[1] for pair in epoch_losses]
     # Show average loss graph per epoch
     plt.figure(figsize=(10, 6))
@@ -167,9 +189,9 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
         plt.legend()
     
     # Show final model parameters
-    print(f"Final model parameters: weight={neuron.weight.value:.4f}, bias={neuron.bias.value:.4f}")
-    print(f"Final average loss: {avg_loss}, epoch={epochs}")
-    print(f"Best average loss: {epoch_losses[0][0]}, epoch={epoch_losses[0][1]}")
+    print(f"Final model parameters: weight={final_weight:.4f}, bias={final_bias:.4f}")
+    print(f"Final average loss: {final_avg_loss}, epoch={epochs}")
+    print(f"Best average loss: {epoch_losses[0][0]}, epoch={best_epoch}")
     
     # Show the plot
     plt.tight_layout()
@@ -184,7 +206,8 @@ if __name__ == "__main__":
 
     # SGD
     sgd = UnidimensionalNeuron()
-    # train_unidimensional_neuron(neuron=sgd, dataset=DATASET, epochs=EPOCHS, batch_size=1)
+    results = train_unidimensional_neuron(neuron=sgd, dataset=DATASET, epochs=EPOCHS, batch_size=1)
+    plot_unidimensional_neuron_training(results)
 
     # BGD
     bgd = UnidimensionalNeuron()
