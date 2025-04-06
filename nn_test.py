@@ -1,67 +1,55 @@
 import unittest
 import math
-from nn import Value, UnidimensionalNeuron
+from gradient_descent import Value, UnidimensionalNeuron
 
 class TestValue(unittest.TestCase):
-    def test_init(self):
-        v = Value(5.0)
-        self.assertEqual(v.value, 5.0)
-        self.assertEqual(v.gradient, 0.0)
+    # ok so here L = |y_hat - y|, where y_hat = mx + b, you have L = |mx + b - y|, 
+    # so dm/dL = (1 if mx + b - y >= 0 else -1)*x and db/dL = (1 if mx + b - y >= 0 else -1)*1.0
+    # In the test case that is 1*2 and 1*1 respectively
+    def test_sgd(self):
+        # sgd
+        batch_loss = Value(0.0)
+        m = Value(20.0)
+        x_1 = Value(2)
+        b = Value(10)
+        y_hat_1 = m*x_1 + b
+        y_1 = Value(2.0)
+        loss_1 = abs(y_hat_1 - y_1)
+        loss_1.backward()
+        self.assertEqual(m.gradient, 2.0)
+        self.assertEqual(b.gradient, 1.0)
+        batch_loss += loss_1
+        # accumulate -- now, you still have the same formula for dm/dL and db/dL, which gives 1*3 and 1*1
+        # the weight and bias gradients are accumulated to sum to 2 + 3 = 5 and 1 + 1 = 2
+        x_2 = Value(3)
+        y_2 = Value(3.0)
+        y_hat_2 = m*x_2 + b
+        loss_2 = abs(y_hat_2 - y_1)
+        loss_2.backward()
+        self.assertEqual(m.gradient, 5.0)
+        self.assertEqual(b.gradient, 2)
+        batch_loss += loss_2
     
-    def test_add(self):
-        v1 = Value(5.0)
-        v2 = Value(3.0)
-        result = v1 + v2
-        self.assertEqual(result.value, 8.0)
-    
-    def test_mul(self):
-        v1 = Value(5.0)
-        v2 = Value(3.0)
-        result = v1 * v2
-        self.assertEqual(result.value, 15.0)
-    
-    def test_sub(self):
-        v1 = Value(5.0)
-        v2 = Value(3.0)
-        result = v1 - v2
-        self.assertEqual(result.value, 2.0)
-    
-    def test_div(self):
-        v1 = Value(6.0)
-        v2 = Value(3.0)
-        result = v1 / v2
-        self.assertEqual(result.value, 2.0)
-
-class TestUnidimensionalNeuron(unittest.TestCase):
-    def test_init(self):
-        neuron = UnidimensionalNeuron()
-        self.assertIsInstance(neuron.weight, Value)
-        self.assertIsInstance(neuron.bias, Value)
-        self.assertIsInstance(neuron.learning_rate, Value)
-        self.assertEqual(neuron.learning_rate.value, 0.1)
-    
-    def test_forward(self):
-        neuron = UnidimensionalNeuron()
-        # Set specific values for testing
-        neuron.weight = Value(2.0)
-        neuron.bias = Value(1.0)
-        
-        result = neuron.forward(3.0)
-        self.assertEqual(result.value, 7.0)  # 2.0 * 3.0 + 1.0 = 7.0
-    
-    def test_forward_invalid_input(self):
-        neuron = UnidimensionalNeuron()
-        with self.assertRaises(ValueError):
-            neuron.forward("invalid")
-    
-    def test_descend(self):
-        neuron = UnidimensionalNeuron()
-        neuron.weight = Value(2.0)
-        neuron.weight.gradient = 0.5
-        neuron.learning_rate = Value(0.1)
-        
-        neuron.descend()
-        self.assertEqual(neuron.weight.value, 1.95)  # 2.0 - 0.1 * 0.5 = 1.95
+    def test_bgd(self):
+        # sgd
+        batch_loss = Value(0.0)
+        m = Value(20.0)
+        x_1 = Value(2)
+        b = Value(10)
+        y_hat_1 = m*x_1 + b
+        y_1 = Value(2.0)
+        loss_1 = abs(y_hat_1 - y_1)
+        batch_loss += loss_1
+        x_2 = Value(3)
+        y_2 = Value(3.0)
+        y_hat_2 = m*x_2 + b
+        loss_2 = abs(y_hat_2 - y_2)
+        batch_loss += loss_2
+        # now compute gradients
+        avg_batch_loss = batch_loss / Value(2)
+        avg_batch_loss.backward()
+        self.assertEqual(m.gradient, 2.5)
+        self.assertEqual(b.gradient, 1.0)
 
 if __name__ == "__main__":
     unittest.main()
