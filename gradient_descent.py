@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import heapq
 
+# When doing summed batch losses / batch size you're not accounting for differences in batch size
+# You want to measure: how does it perform on the entire dataset after 1 epoch? but the weights could change in the middle of that
+# Just use the losses you actually compute
+
 # In the case of the following local derivatives
 # add: d(z = x + y)/dx
 # sub: d(z = x - y)/dx
@@ -121,8 +125,10 @@ class UnidimensionalNeuron:
         self.bias.gradient = 0
 
 def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=1):
+    dataset_size = 0
     with open(dataset, "r") as f:
         dataset = [(Value(float(line.strip().split(",")[0])), Value(float(line.strip().split(",")[1]))) for line in f.readlines()]
+        dataset_size = len(dataset)
     batches = []
     while dataset:
         batch = []
@@ -135,7 +141,7 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
     epoch_losses = []
     for e in range(epochs):
         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        epoch_loss = 0 # sum of batch losses
+        epoch_loss = 0 # sum of individual losses
         batches_processed = 0
         for batch in batches:
             total_batch_loss = Value(0.0)
@@ -144,19 +150,19 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
                 prediction = neuron.forward(x)
                 loss = abs((prediction - y))
                 total_batch_loss += loss
+                epoch_loss += loss.value
             
             avg_batch_loss = total_batch_loss / Value(batch_size)
             avg_batch_loss.backward()
             batches_processed += 1
             if batches_processed % accumulate == 0:
                 neuron.descend()
-            epoch_loss += total_batch_loss.value
         
-        avg_loss = epoch_loss / len(batches)
-        heapq.heappush(epoch_losses, (avg_loss, e))
+        avg_example_loss_per_epoch = epoch_loss / dataset_size # this is probably a better measure than loss / batch
+        heapq.heappush(epoch_losses, (avg_example_loss_per_epoch, e))
         
         print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        print(f"avg loss: {avg_loss}")
+        print(f"avg loss: {avg_example_loss_per_epoch}")
     
     final_weight = neuron.weight.value
     final_bias = neuron.bias.value
