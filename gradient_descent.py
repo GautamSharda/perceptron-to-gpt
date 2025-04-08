@@ -3,42 +3,9 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 import heapq
+from graphviz import Digraph
 
-# When doing summed batch losses / batch size you're not accounting for differences in batch size
-# You want to measure: how does it perform on the entire dataset after 1 epoch? but the weights could change in the middle of that
-# Just use the losses you actually compute
-
-# In the case of the following local derivatives
-# add: d(z = x + y)/dx
-# sub: d(z = x - y)/dx
-# root: d(z)/dz
-# the derivative is 1
-# sub: d(z = x - y)/dy -- this is -1 since y is the right value!
-# mul: d(z = x*y)/dx -- this is y 
-# mul: d(z = x*y)/dy -- this is x
-# div: d(z = x/y)/dx -- this is 1/y
-# div: d(z = x/y)/dy -- this is d(x*y^-1)/dy -- so that's d(c*y^-1)/d -- so that's (c*-y^-2) -- that's (-c/y^2) -- (-x/y^2)
-# abs: d(z = |y|)/dy -- this is d(z = -y)/dy for y < 0 and d(z = y)/dy otherwise, which is -1 and 1 respectively
-
-# TODO:
-# Unit Tests
-# Typing
-# Order matters in batch processing -- it's worth asking why small to large / preserving order in this case works
-# Also worth switching to randomly sampled batches
-# And noting that accumulation tends to work better
-# Bigger batch, bigger loss... duh, they all converge to the same weights and bias
-# Include learning rates in plots
-# Neuron: LR variation = Adam
-# Training: SGD / BGD / Mini-Batch Gradient Descent
-# Batch size = how many examples before going backward. how large computaiton graph.
-# In batch: batch size = N --> 1 backward pass.
-# In stochastic: batch size = 1 --> N backward passes.
-# In mini-batch: N > batch size > 1.
-# Different from accumulation: this is about freq. of UPDATE WEIGHTS / epoch not freq. of GO BACKWARDS / epoch (batch size).
-# So, you want to reset gradients after an update.
-
-# How many forwards before the next backward (batch size)? How many backwards (batches) before the next update (accumulation size)?
-
+# Update graph at each step
 class Value:
     def __init__(self, value, children=None):
         self.value = value
@@ -79,8 +46,6 @@ class Value:
         self.op = '|'
         return Value(self.value*-1 if self.value < 0 else self.value, [self, None])
     
-    # So we are looking at which operation the current value was involved in and then using that to compute it's gradient w.r.t the loss
-    # That means compute gradient w.r.t the parent value (which it does with the 1.0 or other_value etc.) times the parent value's contribuion (which would be the parent's self.grad passed down as chain_rule_grad)
     def backward(self, other_value=None, chain_rule_grad=1.0):
         if self.op == "+":
             self.gradient += 1.0*chain_rule_grad
@@ -112,17 +77,105 @@ class UnidimensionalNeuron:
         self.bias = Value(10.0)
         self.learning_rate = Value(lr)
 
-    def forward(self, input):
-        if not isinstance(input, Value):
+    def forward(self, input_):
+        if not isinstance(input_, Value):
             raise ValueError(f"A unidimensional neuron only supports a Value as an input")
-        mx = Value(self.weight.value*input.value, [self.weight, input])
-        return Value(mx.value + self.bias.value, [mx, self.bias])
+        return self.weight * input_ + self.bias 
+        # mx = Value(self.weight.value*input.value, [self.weight, input])
+        # return Value(mx.value + self.bias.value, [mx, self.bias])
     
     def descend(self):
         self.weight.value = self.weight.value - self.learning_rate.value*self.weight.gradient
         self.bias.value = self.bias.value - self.learning_rate.value*self.bias.gradient
         self.weight.gradient = 0
         self.bias.gradient = 0
+
+def make_compute_graph(root_node, filename="compute_graph"):
+    """
+    Constructs and displays a graph visualization of the computation graph
+    leading to the root_node, inferring operations from child nodes.
+
+    Requires the 'graphviz' Python package and Graphviz software installed.
+    Assumes the Value class stores the operation participated in on the
+    operands ('op' attribute) and references operands in 'children'.
+
+    Args:
+        root_node: The final Value object (root of the graph to visualize).
+        filename: Base name for the output graph file (without extension).
+    """
+    nodes_obj, edges_obj = set(), set()
+    visited_ids = set()
+
+    def build_graph_obj(v):
+        if id(v) in visited_ids:
+            return
+        visited_ids.add(id(v))
+        nodes_obj.add(v)
+        # v.children stores the nodes that were inputs to the op creating v
+        if hasattr(v, 'children') and v.children:
+            for child in v.children:
+                if child: # Skip None children (like in abs)
+                    # Store edge as (child_object, parent_object)
+                    edges_obj.add((child, v))
+                    build_graph_obj(child) # Recurse on children
+
+    build_graph_obj(root_node) # Start traversal from the root
+
+    # Create the graphviz Digraph
+    dot = Digraph(format='png', graph_attr={'rankdir': 'LR'}) # LR = Left to Right
+    op_nodes_created = set() # Track operation nodes to avoid duplicates
+
+    # Add Value nodes to the graph
+    for n in nodes_obj:
+        uid = str(id(n))
+        # Format value and gradient nicely, handle potential NaN
+        val_str = f"{n.value:.4f}" if isinstance(n.value, (int, float)) and not math.isnan(n.value) else str(n.value)
+        grad_str = f"{n.gradient:.4f}" if isinstance(n.gradient, (int, float)) and not math.isnan(n.gradient) else str(n.gradient)
+        label_str = f"val {val_str} | grad {grad_str}"
+        dot.node(name=uid, label=label_str, shape='record')
+
+    # Add Operation nodes and Edges
+    for child, parent in edges_obj:
+        child_uid = str(id(child))
+        parent_uid = str(id(parent))
+
+        # Infer the operation from the child's 'op' attribute
+        # This 'op' signifies the operation that produced the 'parent'
+        op_label = getattr(child, 'op', None) # Get op from child
+
+        if op_label:
+            # Create a unique ID for the operation node associated with the parent
+            op_uid = parent_uid + '_op_' + op_label # Include op in ID for clarity if needed
+
+            # Create the operation node only once per parent-operation pair
+            if op_uid not in op_nodes_created:
+                dot.node(name=op_uid, label=op_label, shape='ellipse')
+                # Edge from operation node to the resulting parent Value node
+                dot.edge(op_uid, parent_uid)
+                op_nodes_created.add(op_uid)
+
+            # Edge from the child Value node to the operation node
+            dot.edge(child_uid, op_uid)
+        else:
+            # If child has no 'op', maybe it's an initial value?
+            # Draw a direct edge for structure, though less informative.
+            # This case might not happen if all ops set child.op correctly.
+            dot.edge(child_uid, parent_uid)
+            # print(f"Warning: Child node {child_uid} has no 'op' for edge to parent {parent_uid}")
+
+
+    try:
+        # Render the graph to a file and attempt to open it
+        dot.render(filename, view=True, cleanup=True)
+        print(f"Graph rendered to {filename}.png and opened.")
+    except Exception as e:
+        # Catch potential errors (e.g., graphviz not found)
+        print(f"Error rendering graph (is graphviz installed and in PATH?): {e}")
+        print("\nGraphviz Source:\n----------------")
+        print(dot.source)
+        print("----------------\n")
+    while True:
+        pass
 
 def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=1):
     dataset_size = 0
@@ -153,6 +206,7 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
                 epoch_loss += loss.value
             
             avg_batch_loss = total_batch_loss / Value(batch_size)
+            # make_compute_graph(avg_batch_loss)
             avg_batch_loss.backward()
             batches_processed += 1
             if batches_processed % accumulate == 0:
