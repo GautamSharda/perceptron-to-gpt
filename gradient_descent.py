@@ -5,7 +5,6 @@ import numpy as np
 import heapq
 from graphviz import Digraph
 
-# Update graph at each step
 class Value:
     def __init__(self, value, children=None):
         self.value = value
@@ -28,14 +27,14 @@ class Value:
         other_value.right = True
         return Value(new_value, [self, other_value])
 
-    def __sub__(self, other_value, op='-'): # IMO makes sense to to do this via add too
+    def __sub__(self, other_value, op='-'): # Makes sense to to do this via add too, same with MUL and DIV
         new_value = self.value - other_value.value
         self.op = op
         other_value.op = op
         other_value.right = True
         return Value(new_value, [self, other_value])
     
-    def __truediv__(self, other_value, op='/'): # IMO makes sense to to do this via mul too
+    def __truediv__(self, other_value, op='/'):
         new_value = self.value / other_value.value
         self.op = op
         other_value.op = op
@@ -63,7 +62,7 @@ class Value:
                 self.gradient += (1 / other_value.value)*chain_rule_grad
         elif self.op == "|":
             self.gradient += -1.0*chain_rule_grad if self.value < 0 else 1.0*chain_rule_grad
-        else: # op will be None for root
+        else: # Op will be None for root
             self.gradient += 1.0
         if not self.children:
             return
@@ -91,18 +90,6 @@ class UnidimensionalNeuron:
         self.bias.gradient = 0
 
 def make_compute_graph(root_node, filename="compute_graph"):
-    """
-    Constructs and displays a graph visualization of the computation graph
-    leading to the root_node, inferring operations from child nodes.
-
-    Requires the 'graphviz' Python package and Graphviz software installed.
-    Assumes the Value class stores the operation participated in on the
-    operands ('op' attribute) and references operands in 'children'.
-
-    Args:
-        root_node: The final Value object (root of the graph to visualize).
-        filename: Base name for the output graph file (without extension).
-    """
     nodes_obj, edges_obj = set(), set()
     visited_ids = set()
 
@@ -111,50 +98,39 @@ def make_compute_graph(root_node, filename="compute_graph"):
             return
         visited_ids.add(id(v))
         nodes_obj.add(v)
-        # v.children stores the nodes that were inputs to the op creating v
         if hasattr(v, 'children') and v.children:
             for child in v.children:
                 if child: # Skip None children (like in abs)
-                    # Store edge as (child_object, parent_object)
                     edges_obj.add((child, v))
-                    build_graph_obj(child) # Recurse on children
+                    build_graph_obj(child)
 
-    build_graph_obj(root_node) # Start traversal from the root
+    build_graph_obj(root_node)
 
-    # Create the graphviz Digraph
-    dot = Digraph(format='png', graph_attr={'rankdir': 'LR'}) # LR = Left to Right
+    dot = Digraph(format='png', graph_attr={'rankdir': 'LR'})
     op_nodes_created = set() # Track operation nodes to avoid duplicates
 
-    # Add Value nodes to the graph
     for n in nodes_obj:
         uid = str(id(n))
-        # Format value and gradient nicely, handle potential NaN
         val_str = f"{n.value:.4f}" if isinstance(n.value, (int, float)) and not math.isnan(n.value) else str(n.value)
         grad_str = f"{n.gradient:.4f}" if isinstance(n.gradient, (int, float)) and not math.isnan(n.gradient) else str(n.gradient)
         label_str = f"val {val_str} | grad {grad_str}"
         dot.node(name=uid, label=label_str, shape='record')
 
-    # Add Operation nodes and Edges
     for child, parent in edges_obj:
         child_uid = str(id(child))
         parent_uid = str(id(parent))
 
-        # Infer the operation from the child's 'op' attribute
-        # This 'op' signifies the operation that produced the 'parent'
         op_label = getattr(child, 'op', None) # Get op from child
 
         if op_label:
-            # Create a unique ID for the operation node associated with the parent
-            op_uid = parent_uid + '_op_' + op_label # Include op in ID for clarity if needed
+            op_uid = parent_uid + '_op_' + op_label
 
             # Create the operation node only once per parent-operation pair
             if op_uid not in op_nodes_created:
                 dot.node(name=op_uid, label=op_label, shape='ellipse')
-                # Edge from operation node to the resulting parent Value node
                 dot.edge(op_uid, parent_uid)
                 op_nodes_created.add(op_uid)
 
-            # Edge from the child Value node to the operation node
             dot.edge(child_uid, op_uid)
         else:
             # If child has no 'op', maybe it's an initial value?
@@ -165,17 +141,15 @@ def make_compute_graph(root_node, filename="compute_graph"):
 
 
     try:
-        # Render the graph to a file and attempt to open it
         dot.render(filename, view=True, cleanup=True)
         print(f"Graph rendered to {filename}.png and opened.")
+        input("Press Enter to continue training...")
     except Exception as e:
-        # Catch potential errors (e.g., graphviz not found)
         print(f"Error rendering graph (is graphviz installed and in PATH?): {e}")
         print("\nGraphviz Source:\n----------------")
         print(dot.source)
         print("----------------\n")
-    while True:
-        pass
+        input("Error displaying graph. Press Enter to continue training...")
 
 def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=1):
     dataset_size = 0
@@ -208,6 +182,7 @@ def train_unidimensional_neuron(neuron, dataset, epochs, batch_size, accumulate=
             avg_batch_loss = total_batch_loss / Value(batch_size)
             # make_compute_graph(avg_batch_loss)
             avg_batch_loss.backward()
+            # make_compute_graph(avg_batch_loss)
             batches_processed += 1
             if batches_processed % accumulate == 0:
                 neuron.descend()
@@ -317,30 +292,37 @@ if __name__ == "__main__":
     EPOCHS = 72
     DATASET = "data.csv"
     labels = []
+    results = []
 
     sgd = UnidimensionalNeuron()
     result = train_unidimensional_neuron(neuron=sgd, dataset=DATASET, epochs=EPOCHS, batch_size=1)
+    results.append(result)
     labels.append("sgd")
 
     bgd = UnidimensionalNeuron()
     result_two = train_unidimensional_neuron(bgd, DATASET, EPOCHS, batch_size=10)
+    results.append(result_two)
     labels.append("bgd")
 
     mbgd = UnidimensionalNeuron()
     results_three = train_unidimensional_neuron(mbgd, DATASET, EPOCHS, batch_size=3)
+    results.append(results_three)
     labels.append("mbgd")
 
     sgd_acc = UnidimensionalNeuron()
     results_four = train_unidimensional_neuron(sgd_acc, DATASET, EPOCHS, batch_size=1, accumulate=10)
+    results.append(results_four)
     labels.append("sgd_acc")
 
     bgd_acc = UnidimensionalNeuron()
     results_five = train_unidimensional_neuron(bgd_acc, DATASET, EPOCHS, batch_size=10, accumulate=1)
+    results.append(results_five)
     labels.append("bgd_acc")
 
     mbgd_acc = UnidimensionalNeuron()
     results_six = train_unidimensional_neuron(mbgd_acc, DATASET, EPOCHS, batch_size=3, accumulate=2)
+    results.append(results_six)
     labels.append("mbgd_acc")
 
-    plot_unidimensional_neuron_training([result, result_two, results_three, results_four, results_five, results_six], labels)
+    plot_unidimensional_neuron_training(results, labels)
     
