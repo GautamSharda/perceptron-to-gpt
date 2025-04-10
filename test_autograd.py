@@ -1,6 +1,6 @@
 import unittest
 import math
-from gradient_descent import Value, UnidimensionalNeuron
+from autograd import Value
 import sympy as sp
 import numpy as np
 
