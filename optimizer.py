@@ -16,10 +16,9 @@ def gradient_descent(neuron, dataset, epochs, batch_size, accumulate=1, viz=Fals
                 example = dataset.pop()
                 batch.append(example)
         batches.append(batch)
-    
+     
     epoch_losses = []
     for e in range(epochs):
-        print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
         epoch_loss = 0 # sum of individual losses
         batches_processed = 0
         for batch in batches:
@@ -43,9 +42,6 @@ def gradient_descent(neuron, dataset, epochs, batch_size, accumulate=1, viz=Fals
         
         avg_example_loss_per_epoch = epoch_loss / dataset_size # this is probably a better measure than loss / batch
         heapq.heappush(epoch_losses, (avg_example_loss_per_epoch, e))
-        
-        print(f"e{e} -- weight: {neuron.weight.value}, bias: {neuron.bias.value}")
-        print(f"avg loss: {avg_example_loss_per_epoch}")
     
     final_weight = neuron.weight.value
     final_bias = neuron.bias.value

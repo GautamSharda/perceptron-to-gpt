@@ -66,7 +66,7 @@ class Value:
         child_1.backward(child_2, self.gradient)
         child_2.backward(child_1, self.gradient) if child_2 else None
 
-def make_computation_graph(root_node, filename="computation_graph"):
+def make_computation_graph(root_node, filename="out/computation_graph"):
     nodes_obj, edges_obj = set(), set()
     visited_ids = set()
 

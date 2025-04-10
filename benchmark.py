@@ -3,11 +3,8 @@ import numpy as np
 import heapq
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
-
-# Imports for our implementation
-from model import UnidimensionalNeuron as CustomNeuron # Alias to avoid name clash
-from optimizer import gradient_descent
-from utils.viz import plot_training
+import subprocess
+import sys
 
 class UnidimensionalDataset(Dataset):
     def __init__(self, filename):
@@ -47,7 +44,6 @@ def train_unidimensional_neuron(model, dataset_path, epochs, batch_size, accumul
     epoch_losses = []
     
     for e in range(epochs):
-        print(f"e{e} -- weight: {model.linear.weight.item()}, bias: {model.linear.bias.item()}")
         epoch_loss = 0
         batches_processed = 0
         optimizer.zero_grad()
@@ -73,9 +69,6 @@ def train_unidimensional_neuron(model, dataset_path, epochs, batch_size, accumul
         avg_example_loss_per_epoch = epoch_loss / dataset_size
         heapq.heappush(epoch_losses, (avg_example_loss_per_epoch, e))
         
-        print(f"e{e} -- weight: {model.linear.weight.item()}, bias: {model.linear.bias.item()}")
-        print(f"avg loss: {avg_example_loss_per_epoch}")
-    
     return {
         'epoch_losses': epoch_losses,
         'final_weight': model.linear.weight.item(),
@@ -202,81 +195,13 @@ if __name__ == "__main__":
     # Plot PyTorch results
     plot_unidimensional_neuron_training(pytorch_results, pytorch_labels)
 
-    # --- Custom Autograd Implementation ---
-    CUSTOM_EPOCHS = 72
-    CUSTOM_DATASET = "data/data.csv"
-    custom_labels = []
-    custom_results = []
-
-    print("\n--- Running Custom Autograd Implementation ---")
-
-    # SGD
-    sgd_custom = CustomNeuron()
-    result_custom_sgd = gradient_descent(neuron=sgd_custom, dataset=CUSTOM_DATASET, epochs=CUSTOM_EPOCHS, batch_size=1)
-    custom_results.append(result_custom_sgd)
-    custom_labels.append("sgd_custom")
-
-    # BGD
-    bgd_custom = CustomNeuron()
-    result_custom_bgd = gradient_descent(bgd_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=10)
-    custom_results.append(result_custom_bgd)
-    custom_labels.append("bgd_custom")
-
-    # MBGD
-    mbgd_custom = CustomNeuron()
-    result_custom_mbgd = gradient_descent(mbgd_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=3)
-    custom_results.append(result_custom_mbgd)
-    custom_labels.append("mbgd_custom")
-
-    # SGD with accumulation
-    sgd_acc_custom = CustomNeuron()
-    result_custom_sgd_acc = gradient_descent(sgd_acc_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=1, accumulate=10)
-    custom_results.append(result_custom_sgd_acc)
-    custom_labels.append("sgd_acc_custom")
-
-    # BGD with accumulation
-    bgd_acc_custom = CustomNeuron()
-    result_custom_bgd_acc = gradient_descent(bgd_acc_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=10, accumulate=1)
-    custom_results.append(result_custom_bgd_acc)
-    custom_labels.append("bgd_acc_custom")
-
-    # MBGD with accumulation
-    mbgd_acc_custom = CustomNeuron()
-    result_custom_mbgd_acc = gradient_descent(mbgd_acc_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=3, accumulate=2)
-    custom_results.append(result_custom_mbgd_acc)
-    custom_labels.append("mbgd_acc_custom")
-
-    # Plot custom results (this function also prints the summary table)
-    plot_training(custom_results, custom_labels)
-
-
-    # --- Final Summary Tables ---
-
+    # --- PyTorch Summary Table ---
     print("\nPyTorch Implementation Results:")
     print("-" * 80)
     print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
     print("-" * 80)
 
     for label, result in zip(pytorch_labels, pytorch_results):
-        # Find best loss (lowest average loss) from the heap
-        best_loss_info = min(result['epoch_losses'], key=lambda x: x[0])
-        best_loss = best_loss_info[0]
-        best_epoch = best_loss_info[1]
-        # Final loss is the loss from the last epoch
-        final_loss_info = sorted(result['epoch_losses'], key=lambda x: x[1])[-1]
-        final_avg_loss = final_loss_info[0]
-
-        print(f"{label:<15} {result['final_weight']:<15.4f} {result['final_bias']:<15.4f} "
-              f"{final_avg_loss:<15.4f} {best_loss:<15.4f} (e{best_epoch})")
-    print("-" * 80)
-
-    # Print Custom Autograd summary table (same logic as plot_training)
-    print("\Our Autograd Implementation Results:")
-    print("-" * 80)
-    print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
-    print("-" * 80)
-
-    for label, result in zip(custom_labels, custom_results):
         best_loss_info = min(result['epoch_losses'], key=lambda x: x[0])
         best_loss = best_loss_info[0]
         best_epoch = best_loss_info[1]
@@ -286,3 +211,29 @@ if __name__ == "__main__":
         print(f"{label:<15} {result['final_weight']:<15.4f} {result['final_bias']:<15.4f} "
               f"{final_avg_loss:<15.4f} {best_loss:<15.4f} (e{best_epoch})")
     print("-" * 80)
+
+    # --- Run Custom Autograd Implementation (main.py) ---
+    print("\n--- Running Custom Autograd Implementation (main.py) ---")
+    try:
+        # Execute main.py using the same Python interpreter
+        process = subprocess.run(
+            [sys.executable, "main.py"],
+            check=True, # Raise exception if main.py fails
+            capture_output=True, # Capture stdout/stderr
+            text=True # Decode output as text
+        )
+        # Print the output from main.py (which includes its prints and the summary table)
+        print(process.stdout)
+        if process.stderr: # Print any errors from main.py
+             print("--- Errors from main.py ---", file=sys.stderr)
+             print(process.stderr, file=sys.stderr)
+             print("---------------------------", file=sys.stderr)
+
+    except FileNotFoundError:
+        print("Error: main.py not found in the current directory.", file=sys.stderr)
+    except subprocess.CalledProcessError as e:
+        print(f"Error running main.py:", file=sys.stderr)
+        print(e.stdout) # Print stdout from main.py even on error
+        print(e.stderr, file=sys.stderr) # Print stderr from main.py
+    except Exception as e:
+        print(f"An unexpected error occurred while running main.py: {e}", file=sys.stderr)
