@@ -4,6 +4,11 @@ import heapq
 import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 
+# Imports for our implementation
+from model import UnidimensionalNeuron as CustomNeuron # Alias to avoid name clash
+from optimizer import gradient_descent
+from utils.viz import plot_training
+
 class UnidimensionalDataset(Dataset):
     def __init__(self, filename):
         data = []
@@ -150,58 +155,134 @@ def plot_unidimensional_neuron_training(results_list, labels=None, colors=None):
     plt.show()
 
 if __name__ == "__main__":
-    EPOCHS = 72
-    DATASET = "data.csv"
-    labels = []
-    results = []
+    # --- PyTorch Implementation ---
+    PYTORCH_EPOCHS = 72
+    PYTORCH_DATASET = "data/data.csv" # Assuming data.csv is in data/
+    pytorch_labels = []
+    pytorch_results = []
+
+    print("--- Running PyTorch Benchmark ---")
 
     # SGD
-    sgd = UnidimensionalNeuron()
-    result = train_unidimensional_neuron(sgd, DATASET, EPOCHS, batch_size=1)
-    results.append(result)
-    labels.append("sgd")
+    sgd_torch = UnidimensionalNeuron()
+    result_torch_sgd = train_unidimensional_neuron(sgd_torch, PYTORCH_DATASET, PYTORCH_EPOCHS, batch_size=1)
+    pytorch_results.append(result_torch_sgd)
+    pytorch_labels.append("sgd_torch")
 
     # BGD
-    bgd = UnidimensionalNeuron()
-    result = train_unidimensional_neuron(bgd, DATASET, EPOCHS, batch_size=10)
-    results.append(result)
-    labels.append("bgd")
+    bgd_torch = UnidimensionalNeuron()
+    result_torch_bgd = train_unidimensional_neuron(bgd_torch, PYTORCH_DATASET, PYTORCH_EPOCHS, batch_size=10)
+    pytorch_results.append(result_torch_bgd)
+    pytorch_labels.append("bgd_torch")
 
     # MBGD
-    mbgd = UnidimensionalNeuron()
-    result = train_unidimensional_neuron(mbgd, DATASET, EPOCHS, batch_size=3)
-    results.append(result)
-    labels.append("mbgd")
+    mbgd_torch = UnidimensionalNeuron()
+    result_torch_mbgd = train_unidimensional_neuron(mbgd_torch, PYTORCH_DATASET, PYTORCH_EPOCHS, batch_size=3)
+    pytorch_results.append(result_torch_mbgd)
+    pytorch_labels.append("mbgd_torch")
 
     # SGD with accumulation
-    sgd_acc = UnidimensionalNeuron()
-    result = train_unidimensional_neuron(sgd_acc, DATASET, EPOCHS, batch_size=1, accumulate=10)
-    results.append(result)
-    labels.append("sgd_acc")
+    sgd_acc_torch = UnidimensionalNeuron()
+    result_torch_sgd_acc = train_unidimensional_neuron(sgd_acc_torch, PYTORCH_DATASET, PYTORCH_EPOCHS, batch_size=1, accumulate=10)
+    pytorch_results.append(result_torch_sgd_acc)
+    pytorch_labels.append("sgd_acc_torch")
 
     # BGD with accumulation
-    bgd_acc = UnidimensionalNeuron()
-    result = train_unidimensional_neuron(bgd_acc, DATASET, EPOCHS, batch_size=10, accumulate=1)
-    results.append(result)
-    labels.append("bgd_acc")
+    bgd_acc_torch = UnidimensionalNeuron()
+    result_torch_bgd_acc = train_unidimensional_neuron(bgd_acc_torch, PYTORCH_DATASET, PYTORCH_EPOCHS, batch_size=10, accumulate=1)
+    pytorch_results.append(result_torch_bgd_acc)
+    pytorch_labels.append("bgd_acc_torch")
 
     # MBGD with accumulation
-    mbgd_acc = UnidimensionalNeuron()
-    result = train_unidimensional_neuron(mbgd_acc, DATASET, EPOCHS, batch_size=3, accumulate=2)
-    results.append(result)
-    labels.append("mbgd_acc")
+    mbgd_acc_torch = UnidimensionalNeuron()
+    result_torch_mbgd_acc = train_unidimensional_neuron(mbgd_acc_torch, PYTORCH_DATASET, PYTORCH_EPOCHS, batch_size=3, accumulate=2)
+    pytorch_results.append(result_torch_mbgd_acc)
+    pytorch_labels.append("mbgd_acc_torch")
 
-    # Plot results
-    plot_unidimensional_neuron_training(results, labels)
+    # Plot PyTorch results
+    plot_unidimensional_neuron_training(pytorch_results, pytorch_labels)
 
-    # Print summary table
+    # --- Custom Autograd Implementation ---
+    CUSTOM_EPOCHS = 72
+    CUSTOM_DATASET = "data/data.csv"
+    custom_labels = []
+    custom_results = []
+
+    print("\n--- Running Custom Autograd Implementation ---")
+
+    # SGD
+    sgd_custom = CustomNeuron()
+    result_custom_sgd = gradient_descent(neuron=sgd_custom, dataset=CUSTOM_DATASET, epochs=CUSTOM_EPOCHS, batch_size=1)
+    custom_results.append(result_custom_sgd)
+    custom_labels.append("sgd_custom")
+
+    # BGD
+    bgd_custom = CustomNeuron()
+    result_custom_bgd = gradient_descent(bgd_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=10)
+    custom_results.append(result_custom_bgd)
+    custom_labels.append("bgd_custom")
+
+    # MBGD
+    mbgd_custom = CustomNeuron()
+    result_custom_mbgd = gradient_descent(mbgd_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=3)
+    custom_results.append(result_custom_mbgd)
+    custom_labels.append("mbgd_custom")
+
+    # SGD with accumulation
+    sgd_acc_custom = CustomNeuron()
+    result_custom_sgd_acc = gradient_descent(sgd_acc_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=1, accumulate=10)
+    custom_results.append(result_custom_sgd_acc)
+    custom_labels.append("sgd_acc_custom")
+
+    # BGD with accumulation
+    bgd_acc_custom = CustomNeuron()
+    result_custom_bgd_acc = gradient_descent(bgd_acc_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=10, accumulate=1)
+    custom_results.append(result_custom_bgd_acc)
+    custom_labels.append("bgd_acc_custom")
+
+    # MBGD with accumulation
+    mbgd_acc_custom = CustomNeuron()
+    result_custom_mbgd_acc = gradient_descent(mbgd_acc_custom, CUSTOM_DATASET, CUSTOM_EPOCHS, batch_size=3, accumulate=2)
+    custom_results.append(result_custom_mbgd_acc)
+    custom_labels.append("mbgd_acc_custom")
+
+    # Plot custom results (this function also prints the summary table)
+    plot_training(custom_results, custom_labels)
+
+
+    # --- Final Summary Tables ---
+
     print("\nPyTorch Implementation Results:")
     print("-" * 80)
     print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
     print("-" * 80)
-    
-    for label, result in zip(labels, results):
-        best_loss = min(result['epoch_losses'], key=lambda x: x[0])[0]
-        best_epoch = min(result['epoch_losses'], key=lambda x: x[0])[1]
+
+    for label, result in zip(pytorch_labels, pytorch_results):
+        # Find best loss (lowest average loss) from the heap
+        best_loss_info = min(result['epoch_losses'], key=lambda x: x[0])
+        best_loss = best_loss_info[0]
+        best_epoch = best_loss_info[1]
+        # Final loss is the loss from the last epoch
+        final_loss_info = sorted(result['epoch_losses'], key=lambda x: x[1])[-1]
+        final_avg_loss = final_loss_info[0]
+
         print(f"{label:<15} {result['final_weight']:<15.4f} {result['final_bias']:<15.4f} "
-              f"{result['final_avg_loss']:<15.4f} {best_loss:<15.4f} (e{best_epoch})")
+              f"{final_avg_loss:<15.4f} {best_loss:<15.4f} (e{best_epoch})")
+    print("-" * 80)
+
+    # Print Custom Autograd summary table (same logic as plot_training)
+    print("\Our Autograd Implementation Results:")
+    print("-" * 80)
+    print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
+    print("-" * 80)
+
+    for label, result in zip(custom_labels, custom_results):
+        best_loss_info = min(result['epoch_losses'], key=lambda x: x[0])
+        best_loss = best_loss_info[0]
+        best_epoch = best_loss_info[1]
+        final_loss_info = sorted(result['epoch_losses'], key=lambda x: x[1])[-1]
+        final_avg_loss = final_loss_info[0]
+
+        print(f"{label:<15} {result['final_weight']:<15.4f} {result['final_bias']:<15.4f} "
+              f"{final_avg_loss:<15.4f} {best_loss:<15.4f} (e{best_epoch})")
+    print("-" * 80)
