@@ -1,6 +1,6 @@
 from model import UnidimensionalNeuron
 from optimizer import gradient_descent
-from viz import plot_training
+from utils.viz import plot_training
 
 if __name__ == "__main__":
     EPOCHS = 72
