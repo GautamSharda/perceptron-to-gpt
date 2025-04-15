@@ -7,10 +7,26 @@ typedef struct{
     double gradient;
 } Value;
 
+double backward(Value *v){
+    // TODO: implement
+}
+
 typedef struct{
     Value weight;
     Value bias;
+    double lr;
 } Neuron;
+
+double forward(Neuron *neuron, double x){
+    return neuron->weight.value*x + neuron->bias.value; // we NEED to not access value directly, but rather overwrite __mul__ to implicitly build the compute graph here
+}
+
+void descend(Neuron *n){
+    n->weight.value = n->weight.value - n->lr*n->weight.gradient;
+    n->bias.value = n->bias.value - n->lr*n->bias.gradient;
+    n->weight.gradient = 0.0;
+    n->bias.gradient = 0.0;
+}
 
 typedef struct {
     double x;
@@ -51,11 +67,7 @@ typedef struct {
     int size;
 } DoubleArray;
 
-double forward(Neuron *neuron, double x){
-    return neuron->weight.value*x + neuron->bias.value; // BUT I'd prefer to implicitly build the compute graph here
-}
-
-Result gradient_descent(Neuron n, int epochs, DataPoint *data_array, int data_size, int batch_size, int accum){
+Result gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_size, int batch_size, int accum){
     Results result;
     result.epochs = epochs;
     result.epoch_losses = NULL; // This should be allocated if needed
@@ -99,13 +111,13 @@ Result gradient_descent(Neuron n, int epochs, DataPoint *data_array, int data_si
                 printf("  DataPoint: x=%.2f, y=%.2f\n", 
                         batches[b].datapoints[d].x, 
                         batches[b].datapoints[d].y);
-                batch_loss += n.foward(batches[b].datapoints[d].x) - batches[b].datapoints[d].y; // define forward
+                batch_loss += fabs(foward(&n, batches[b].datapoints[d].x) - batches[b].datapoints[d].y);
             }
             epoch_loss += batch_loss.value;
-            loss.backward();
+            loss.backward(); // define backward
             accum_count += 1;
             if (accum_count % accum == 0){
-                n.descend(); // define descend
+                descend(&n); // define descend
             }
         }
         epoch_losses[e] = epoch_loss / num_batches;
@@ -147,8 +159,9 @@ int main(){
     Neuron neuron;
     neuron.weight = weight;
     neuron.bias = bias;
+    neuron.lr = 0.025;
 
-    Result result = gradient_descent(1, (DataPoint *) DATA, 10, 3, 1);
+    Result result = gradient_descent(&neuron, 1, (DataPoint *) DATA, 10, 3, 1);
     // Print the results
     printf("Training Results:\n");
     printf("----------------\n");
