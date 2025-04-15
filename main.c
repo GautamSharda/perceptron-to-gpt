@@ -5,7 +5,23 @@
 typedef struct{
     double value;
     double gradient;
+    int op; // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs
+    int right;
 } Value;
+
+// define constructor
+
+Value add_value(Value *val_1, Value *val_2){
+    val_1.op = 0;
+    val_2.op = 0;
+    val_2.right = 1;
+    Value result;
+    result.value = val_1->value + val_2->value;
+    result.gradient = 0;
+    result.op = NULL;
+    result.right = 0;
+    return result;
+}
 
 double backward(Value *v){
     // TODO: implement
@@ -18,7 +34,7 @@ typedef struct{
 } Neuron;
 
 double forward(Neuron *neuron, double x){
-    return neuron->weight.value*x + neuron->bias.value; // we NEED to not access value directly, but rather overwrite __mul__ to implicitly build the compute graph here
+    return add_value(mul_values(neuron->weight, x), neuron->bias); // we NEED to not access value directly, but rather overwrite __mul__ to implicitly build the compute graph here
 }
 
 void descend(Neuron *n){
@@ -103,6 +119,8 @@ Result gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_s
             Value batch_loss;
             batch_loss.value = 0.0;
             batch_loss.gradient = 0.0;
+            batch_loss.op = NULL;
+            batch_loss.right = 0;
             for (int d = 0; d < batch_size; d++){
                 int data_index = b * batch_size + d;
                 if (data_index >= data_size) {
@@ -167,5 +185,6 @@ int main(){
     printf("----------------\n");
     printf("Final Weight: %.4f\n", result.final_weight);
     printf("Final Bias: %.4f\n", result.final_bias);
-    printf("Best Loss: %.4f (at epoch %d)\n", result.best_loss, result.best_epoch);    
+    printf("Best Loss: %.4f (at epoch %d)\n", result.best_loss, result.best_epoch);
+    free(results.epoch_losses);    
 }
