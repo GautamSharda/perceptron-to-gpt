@@ -3,7 +3,7 @@ import numpy as np
 
 def plot_training(results_list, labels=None, colors=None):
     if labels is None:
-        labels = [f"Model {i+1}" for i in range(len(results_list))]
+        labels = [f"Optimizer {i+1}" for i in range(len(results_list))]
     
     if colors is None:
         colors = plt.cm.tab10(np.linspace(0, 1, len(results_list)))
@@ -59,7 +59,7 @@ def plot_training(results_list, labels=None, colors=None):
     
     print("\nSummary of Results:")
     print("-" * 80)
-    print(f"{'Model':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
+    print(f"{'Optimizer':<15} {'Final Weight':<15} {'Final Bias':<15} {'Final Loss':<15} {'Best Loss':<15}")
     print("-" * 80)
     
     for i, result in enumerate(results_list):

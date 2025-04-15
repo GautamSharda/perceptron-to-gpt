@@ -35,6 +35,7 @@ typedef struct {
     double final_weight;
     double final_bias;
     double final_avg_loss;
+    double best_loss;
     int best_epoch;
     int epochs;
 } Results;
@@ -45,18 +46,23 @@ typedef struct {
 
 const int DATA_SIZE = 10;
 
+typedef struct {
+    double *d;
+    int size;
+} DoubleArray;
 
 double forward(Neuron *neuron, double x){
     return neuron->weight.value*x + neuron->bias.value; // BUT I'd prefer to implicitly build the compute graph here
 }
 
-void gradient_descent(int epochs, DataPoint *data_array, int data_size, int batch_size, int accum){
+Result gradient_descent(Neuron n, int epochs, DataPoint *data_array, int data_size, int batch_size, int accum){
     Results result;
     result.epochs = epochs;
     result.epoch_losses = NULL; // This should be allocated if needed
     result.final_weight = 0.0;
     result.final_bias = 0.0;
     result.final_avg_loss = 0.0;
+    result.best_loss = 0.0;
     result.best_epoch = 0;
 
     int num_batches = (int)ceil((double) data_size / batch_size);
@@ -76,38 +82,57 @@ void gradient_descent(int epochs, DataPoint *data_array, int data_size, int batc
         batches[b] = batch;
     }
 
-    printf("Number of batches: %d\n", num_batches);
-    for (int i = 0; i < num_batches; i++) {
-        printf("Batch %d:\n", i);
-        for (int j = 0; j < batch_size; j++) {
-            int data_index = i * batch_size + j;
-            if (data_index < data_size) {
-                printf("  DataPoint %d: x=%.2f, y=%.2f\n", 
-                       data_index, 
-                       batches[i].datapoints[j].x, 
-                       batches[i].datapoints[j].y);
+    double epoch_loss = 0.0;
+    double *epoch_losses = malloc(epochs*sizeof(double));
+    for (int e = 0; e < epochs; e++){
+        int accum_count = 0;
+        for (int b = 0; b < num_batches; b++){
+            printf("Batch %d:\n", b);
+            Value batch_loss;
+            batch_loss.value = 0.0;
+            batch_loss.gradient = 0.0;
+            for (int d = 0; d < batch_size; d++){
+                int data_index = b * batch_size + d;
+                if (data_index >= data_size) {
+                    break;
+                }
+                printf("  DataPoint: x=%.2f, y=%.2f\n", 
+                        batches[b].datapoints[d].x, 
+                        batches[b].datapoints[d].y);
+                batch_loss += n.foward(batches[b].datapoints[d].x) - batches[b].datapoints[d].y; // define forward
+            }
+            epoch_loss += batch_loss.value;
+            loss.backward();
+            accum_count += 1;
+            if (accum_count % accum == 0){
+                n.descend(); // define descend
             }
         }
+        epoch_losses[e] = epoch_loss / num_batches;
     }
+    result.epoch_losses = epoch_losses;
+    result.final_weight = n.weight.value;
+    result.final_bias = n.bias.value;
+    result.final_avg_loss[epochs-1];
 
-    for (int b = 0; b < num_batches; b++){
-        printf("Batch %d:\n", b);
-        for (int d = 0; d < batch_size; d++){
-            int data_index = b * batch_size + d;
-            if (data_index >= data_size) {
-                break;
-            }
-            printf("  DataPoint: x=%.2f, y=%.2f\n", 
-                    batches[b].datapoints[d].x, 
-                    batches[b].datapoints[d].y);
-
+    // linear scan to find min
+    double curr_min = epoch_losses[0];
+    int best_epoch = 1;
+    for (int e = 1; e < epochs; e++){
+        if (curr_min > epoch_losses[e]){
+            curr_min = epoch_losses[e];
+            best_epoch = e + 1;
         }
     }
+    result.best_loss = curr_min;
+    result.best_epoch = best_epoch;
 
     for (int b = 0; b < num_batches; b++){
         free(batches[b].datapoints);
     }
     free(batches);
+
+    return result;
 }
 
 int main(){
@@ -123,10 +148,11 @@ int main(){
     neuron.weight = weight;
     neuron.bias = bias;
 
-    gradient_descent(1, (DataPoint *) DATA, 10, 3, 1);
-
-    // for (int i = 0; i < DATA_SIZE; i++){
-    //     double loss = forward(&neuron, DATA[i].x) - DATA[i].y;
-    //     printf("%f\n", loss);
-    // }
+    Result result = gradient_descent(1, (DataPoint *) DATA, 10, 3, 1);
+    // Print the results
+    printf("Training Results:\n");
+    printf("----------------\n");
+    printf("Final Weight: %.4f\n", result.final_weight);
+    printf("Final Bias: %.4f\n", result.final_bias);
+    printf("Best Loss: %.4f (at epoch %d)\n", result.best_loss, result.best_epoch);    
 }
