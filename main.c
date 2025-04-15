@@ -59,23 +59,27 @@ void gradient_descent(int epochs, DataPoint *data_array, int data_size, int batc
     result.final_avg_loss = 0.0;
     result.best_epoch = 0;
 
-    double num_batches = ceil((double)data_size / batch_size);
+    int num_batches = (int)ceil((double) data_size / batch_size);
     Batch *batches = (Batch *)malloc(num_batches * sizeof(Batch));
-    for (int d = 0; d < data_size; d++){
+    for (int b = 0; b < num_batches; b++){
         DataPoint *datapoints = (DataPoint *)malloc(batch_size*sizeof(DataPoint));
-        datapoints[d] = data_array[d];
-        if (d % batch_size == 0){
-            Batch batch;
-            batch.datapoints = datapoints;
-            batches[d / batch_size] = batch;
+        int batch_count = 0;
+        for(int d = b*batch_size; d < data_size; d++){
+            if (batch_count == batch_size){
+                break;
+            }
+            datapoints[batch_count] = data_array[d];
+            batch_count++;
         }
+        Batch batch;
+        batch.datapoints = datapoints;
+        batches[b] = batch;
     }
-    // Print batches information
-    printf("Number of batches: %.0f\n", num_batches);
-    for (int i = 0; i < (int)num_batches; i++) {
+
+    printf("Number of batches: %d\n", num_batches);
+    for (int i = 0; i < num_batches; i++) {
         printf("Batch %d:\n", i);
         for (int j = 0; j < batch_size; j++) {
-            // Check if we're still within data bounds
             int data_index = i * batch_size + j;
             if (data_index < data_size) {
                 printf("  DataPoint %d: x=%.2f, y=%.2f\n", 
@@ -85,12 +89,25 @@ void gradient_descent(int epochs, DataPoint *data_array, int data_size, int batc
             }
         }
     }
-    
-    for (int i = 0; i < (int)num_batches; i++) {
-        free(batches[i].datapoints);
+
+    for (int b = 0; b < num_batches; b++){
+        printf("Batch %d:\n", b);
+        for (int d = 0; d < batch_size; d++){
+            int data_index = b * batch_size + d;
+            if (data_index >= data_size) {
+                break;
+            }
+            printf("  DataPoint: x=%.2f, y=%.2f\n", 
+                    batches[b].datapoints[d].x, 
+                    batches[b].datapoints[d].y);
+
+        }
+    }
+
+    for (int b = 0; b < num_batches; b++){
+        free(batches[b].datapoints);
     }
     free(batches);
-    // result;
 }
 
 int main(){
@@ -106,7 +123,7 @@ int main(){
     neuron.weight = weight;
     neuron.bias = bias;
 
-    gradient_descent(1, DATA, 10, 3, 1);
+    gradient_descent(1, (DataPoint *) DATA, 10, 3, 1);
 
     // for (int i = 0; i < DATA_SIZE; i++){
     //     double loss = forward(&neuron, DATA[i].x) - DATA[i].y;
