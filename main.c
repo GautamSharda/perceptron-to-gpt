@@ -19,7 +19,7 @@ Value add_values(Value *val_1, Value *val_2){
     Value result;
     result.value = val_1->value + val_2->value;
     result.gradient = 0;
-    result.op = NULL;
+    result.op = -1;
     result.right = 0;
     result.children[0] = val_1;
     result.children[1] = val_2;
@@ -33,7 +33,7 @@ Value mul_value(Value *val_1, Value *val_2){
     Value result;
     result.value = val_1->value * val_2->value;
     result.gradient = 0;
-    result.op = NULL;
+    result.op = -1;
     result.right = 0;
     result.children[0] = val_1;
     result.children[1] = val_2;
@@ -47,7 +47,7 @@ Value sub_values(Value *val_1, Value *val_2){
     Value result;
     result.value = val_1->value - val_2->value;
     result.gradient = 0;
-    result.op = NULL;
+    result.op = -1;
     result.right = 0;
     result.children[0] = val_1;
     result.children[1] = val_2;
@@ -61,7 +61,7 @@ Value div_values(Value *val_1, Value *val_2){
     Value result;
     result.value = val_1->value / val_2->value;
     result.gradient = 0;
-    result.op = NULL;
+    result.op = -1;
     result.right = 0;
     result.children[0] = val_1;
     result.children[1] = val_2;
@@ -73,15 +73,50 @@ Value fabs_value(Value *val_1){
     Value result;
     result.value = fabs(val_1->value);
     result.gradient = 0;
-    result.op = NULL;
+    result.op = -1;
     result.right = 0;
     result.children[0] = val_1;
     result.children[1] = NULL;
     return result;
 }
 
-double backward(Value *v){
-    // TODO: implement
+void backward(Value *v, Value *other, double chain_rule_grad){
+    switch (v->op) {
+        // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs
+        case 0:
+            v->gradient += 1.0*chain_rule_grad;
+            break;
+        case 1:
+            v->gradient += other->value*chain_rule_grad;
+            break;
+        case 2:
+            if (v->right) {
+                v->gradient += -1.0*chain_rule_grad;
+            } else {
+                v->gradient += 1.0*chain_rule_grad;
+            }
+            break;
+        case 3:
+            if (v->right) {
+                v->gradient += ((-other->value) / (v->value * v->value)) * chain_rule_grad;
+            } else {
+                v->gradient += (1.0 / other->value) * chain_rule_grad;
+            }
+            break;
+        case 4:
+            v->gradient += ((v->value < 0) ? -1.0 : 1.0) * chain_rule_grad;
+            break;
+        default: // root
+            v->gradient += 1.0;
+            break;
+    }
+
+    if (v->children[0] != NULL) {
+        backward(v->children[0]);
+    }
+    if (v->children[1] != NULL) {
+        backward(v->children[1]);
+    }
 }
 
 typedef struct{
