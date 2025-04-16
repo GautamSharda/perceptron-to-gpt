@@ -1,17 +1,18 @@
 #include <stdio.h>
-#include <math.h>   // Include for ceil()
-#include <stdlib.h> // Include for malloc() and free()
+#include <math.h>
+#include <stdlib.h>
 
 typedef struct{
     double value;
     double gradient;
     int op; // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs
     int right;
+    Value *children[2];
 } Value;
 
 // define constructor
 
-Value add_value(Value *val_1, Value *val_2){
+Value add_values(Value *val_1, Value *val_2){
     val_1.op = 0;
     val_2.op = 0;
     val_2.right = 1;
@@ -20,6 +21,62 @@ Value add_value(Value *val_1, Value *val_2){
     result.gradient = 0;
     result.op = NULL;
     result.right = 0;
+    result.children[0] = val_1;
+    result.children[1] = val_2;
+    return result;
+}
+
+Value mul_value(Value *val_1, Value *val_2){
+    val_1.op = 1;
+    val_2.op = 1;
+    val_2.right = 1;
+    Value result;
+    result.value = val_1->value * val_2->value;
+    result.gradient = 0;
+    result.op = NULL;
+    result.right = 0;
+    result.children[0] = val_1;
+    result.children[1] = val_2;
+    return result;
+}
+
+Value sub_values(Value *val_1, Value *val_2){
+    val_1.op = 2;
+    val_2.op = 2;
+    val_2.right = 1;
+    Value result;
+    result.value = val_1->value - val_2->value;
+    result.gradient = 0;
+    result.op = NULL;
+    result.right = 0;
+    result.children[0] = val_1;
+    result.children[1] = val_2;
+    return result;
+}
+
+Value div_values(Value *val_1, Value *val_2){
+    val_1.op = 3;
+    val_2.op = 3;
+    val_2.right = 1;
+    Value result;
+    result.value = val_1->value / val_2->value;
+    result.gradient = 0;
+    result.op = NULL;
+    result.right = 0;
+    result.children[0] = val_1;
+    result.children[1] = val_2;
+    return result;
+}
+
+Value fabs_value(Value *val_1){
+    val_1.op = 4;
+    Value result;
+    result.value = fabs(val_1->value);
+    result.gradient = 0;
+    result.op = NULL;
+    result.right = 0;
+    result.children[0] = val_1;
+    result.children[1] = NULL;
     return result;
 }
 
@@ -34,7 +91,7 @@ typedef struct{
 } Neuron;
 
 double forward(Neuron *neuron, double x){
-    return add_value(mul_values(neuron->weight, x), neuron->bias); // we NEED to not access value directly, but rather overwrite __mul__ to implicitly build the compute graph here
+    return add_values(mul_values(neuron->weight, x), neuron->bias);
 }
 
 void descend(Neuron *n){
@@ -129,13 +186,30 @@ Result gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_s
                 printf("  DataPoint: x=%.2f, y=%.2f\n", 
                         batches[b].datapoints[d].x, 
                         batches[b].datapoints[d].y);
-                batch_loss += fabs(foward(&n, batches[b].datapoints[d].x) - batches[b].datapoints[d].y);
+                Value x_val;
+                x_val.value = batches[b].datapoints[d].x;
+                x_val.gradient = 0.0;
+                x_val.op = NULL;
+                x_val.right = 0;
+                Value y_val;
+                y_val.value = batches[b].datapoints[d].y;
+                y_val.gradient = 0.0;
+                y_val.op = NULL;
+                y_val.right = 0;
+                batch_loss = add_values(batch_loss, fabs_values(sub_values(foward(&n, x_val), y_val)));
             }
             epoch_loss += batch_loss.value;
-            loss.backward(); // define backward
+
+            Value batch_size_val;
+            batch_size_val.value = batch_size;
+            batch_size_val.gradient = 0.0;
+            batch_size_val.op = NULL;
+            batch_size_val.right = 0;
+            Value avg_loss = div_values(batch_loss, batch_size_val);
+            avg_loss.backward(); // define backward
             accum_count += 1;
             if (accum_count % accum == 0){
-                descend(&n); // define descend
+                descend(&n);
             }
         }
         epoch_losses[e] = epoch_loss / num_batches;
