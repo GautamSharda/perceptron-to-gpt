@@ -2,20 +2,20 @@
 #include <math.h>
 #include <stdlib.h>
 
-typedef struct{
+typedef struct Value {
     double value;
     double gradient;
-    int op; // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs
+    int op; // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs, -1 = default / root
     int right;
-    Value *children[2];
+    struct Value *children[2];
 } Value;
 
-// define constructor
+// define and use constructor
 
 Value add_values(Value *val_1, Value *val_2){
-    val_1.op = 0;
-    val_2.op = 0;
-    val_2.right = 1;
+    val_1->op = 0;
+    val_2->op = 0;
+    val_2->right = 1;
     Value result;
     result.value = val_1->value + val_2->value;
     result.gradient = 0;
@@ -26,10 +26,10 @@ Value add_values(Value *val_1, Value *val_2){
     return result;
 }
 
-Value mul_value(Value *val_1, Value *val_2){
-    val_1.op = 1;
-    val_2.op = 1;
-    val_2.right = 1;
+Value mul_values(Value *val_1, Value *val_2){
+    val_1->op = 1;
+    val_2->op = 1;
+    val_2->right = 1;
     Value result;
     result.value = val_1->value * val_2->value;
     result.gradient = 0;
@@ -41,9 +41,9 @@ Value mul_value(Value *val_1, Value *val_2){
 }
 
 Value sub_values(Value *val_1, Value *val_2){
-    val_1.op = 2;
-    val_2.op = 2;
-    val_2.right = 1;
+    val_1->op = 2;
+    val_2->op = 2;
+    val_2->right = 1;
     Value result;
     result.value = val_1->value - val_2->value;
     result.gradient = 0;
@@ -55,9 +55,9 @@ Value sub_values(Value *val_1, Value *val_2){
 }
 
 Value div_values(Value *val_1, Value *val_2){
-    val_1.op = 3;
-    val_2.op = 3;
-    val_2.right = 1;
+    val_1->op = 3;
+    val_2->op = 3;
+    val_2->right = 1;
     Value result;
     result.value = val_1->value / val_2->value;
     result.gradient = 0;
@@ -69,7 +69,7 @@ Value div_values(Value *val_1, Value *val_2){
 }
 
 Value fabs_value(Value *val_1){
-    val_1.op = 4;
+    val_1->op = 4;
     Value result;
     result.value = fabs(val_1->value);
     result.gradient = 0;
@@ -112,10 +112,10 @@ void backward(Value *v, Value *other, double chain_rule_grad){
     }
 
     if (v->children[0] != NULL) {
-        backward(v->children[0]);
+        backward(v->children[0], v->children[1], v->gradient);
     }
     if (v->children[1] != NULL) {
-        backward(v->children[1]);
+        backward(v->children[1], v->children[0], v->gradient);
     }
 }
 
@@ -125,8 +125,9 @@ typedef struct{
     double lr;
 } Neuron;
 
-double forward(Neuron *neuron, double x){
-    return add_values(mul_values(neuron->weight, x), neuron->bias);
+Value forward(Neuron *neuron, Value *x){
+    Value mul_result = mul_values(&neuron->weight, x);
+    return add_values(&mul_result, &neuron->bias);
 }
 
 void descend(Neuron *n){
@@ -175,7 +176,7 @@ typedef struct {
     int size;
 } DoubleArray;
 
-Result gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_size, int batch_size, int accum){
+Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_size, int batch_size, int accum){
     Results result;
     result.epochs = epochs;
     result.epoch_losses = NULL; // This should be allocated if needed
@@ -211,7 +212,7 @@ Result gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_s
             Value batch_loss;
             batch_loss.value = 0.0;
             batch_loss.gradient = 0.0;
-            batch_loss.op = NULL;
+            batch_loss.op = -1;
             batch_loss.right = 0;
             for (int d = 0; d < batch_size; d++){
                 int data_index = b * batch_size + d;
@@ -224,35 +225,39 @@ Result gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_s
                 Value x_val;
                 x_val.value = batches[b].datapoints[d].x;
                 x_val.gradient = 0.0;
-                x_val.op = NULL;
+                x_val.op = -1;
                 x_val.right = 0;
                 Value y_val;
                 y_val.value = batches[b].datapoints[d].y;
                 y_val.gradient = 0.0;
-                y_val.op = NULL;
+                y_val.op = -1;
                 y_val.right = 0;
-                batch_loss = add_values(batch_loss, fabs_values(sub_values(foward(&n, x_val), y_val)));
+
+                Value prediction = forward(n, &x_val);
+                Value diff = sub_values(&prediction, &y_val);
+                Value loss_term = fabs_value(&diff);
+                batch_loss = add_values(&batch_loss, &loss_term);
             }
             epoch_loss += batch_loss.value;
 
             Value batch_size_val;
             batch_size_val.value = batch_size;
             batch_size_val.gradient = 0.0;
-            batch_size_val.op = NULL;
+            batch_size_val.op = -1;
             batch_size_val.right = 0;
-            Value avg_loss = div_values(batch_loss, batch_size_val);
-            avg_loss.backward(); // define backward
+            Value avg_loss = div_values(&batch_loss, &batch_size_val);
+            backward(&avg_loss, NULL, 1.0);
             accum_count += 1;
             if (accum_count % accum == 0){
-                descend(&n);
+                descend(n);
             }
         }
         epoch_losses[e] = epoch_loss / num_batches;
     }
     result.epoch_losses = epoch_losses;
-    result.final_weight = n.weight.value;
-    result.final_bias = n.bias.value;
-    result.final_avg_loss[epochs-1];
+    result.final_weight = n->weight.value;
+    result.final_bias = n->bias.value;
+    result.final_avg_loss = epoch_losses[epochs-1];
 
     // linear scan to find min
     double curr_min = epoch_losses[0];
@@ -288,12 +293,12 @@ int main(){
     neuron.bias = bias;
     neuron.lr = 0.025;
 
-    Result result = gradient_descent(&neuron, 1, (DataPoint *) DATA, 10, 3, 1);
+    Results result = gradient_descent(&neuron, 1, (DataPoint *) DATA, 10, 3, 1);
     // Print the results
     printf("Training Results:\n");
     printf("----------------\n");
     printf("Final Weight: %.4f\n", result.final_weight);
     printf("Final Bias: %.4f\n", result.final_bias);
     printf("Best Loss: %.4f (at epoch %d)\n", result.best_loss, result.best_epoch);
-    free(results.epoch_losses);    
+    free(result.epoch_losses);    
 }
