@@ -81,6 +81,16 @@ Value fabs_value(Value *val_1){
 }
 
 void backward(Value *v, Value *other, double chain_rule_grad){
+
+    // Safely print children's values, printing NaN if a child is NULL
+    printf("Starting backward pass with value: %.4f, children: %f, %f\n",
+           v->value,
+           (v->children[0] != NULL) ? v->children[0]->value : NAN, // Check child 0
+           (v->children[1] != NULL) ? v->children[1]->value : NAN  // Check child 1
+          );
+    // Need #include <math.h> for NAN
+
+    // printf("Operation: %d\n", v->op); // Keep this if useful for debugging the loop
     switch (v->op) {
         // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs
         case 0:
@@ -131,10 +141,15 @@ Value forward(Neuron *neuron, Value *x){
 }
 
 void descend(Neuron *n){
+    // Print weight, bias, their gradients, and the learning rate
+    printf("Weight: %.4f, Gradient: %.4f\n", n->weight.value, n->weight.gradient);
+    printf("Bias: %.4f, Gradient: %.4f\n", n->bias.value, n->bias.gradient);
+    printf("Learning Rate: %.4f\n", n->lr);
     n->weight.value = n->weight.value - n->lr*n->weight.gradient;
     n->bias.value = n->bias.value - n->lr*n->bias.gradient;
     n->weight.gradient = 0.0;
     n->bias.gradient = 0.0;
+    printf("NEW Weight: %.4f\n", n->weight.value);
 }
 
 typedef struct {
@@ -209,11 +224,15 @@ Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_
         int accum_count = 0;
         for (int b = 0; b < num_batches; b++){
             printf("Batch %d:\n", b);
-            Value batch_loss;
-            batch_loss.value = 0.0;
-            batch_loss.gradient = 0.0;
-            batch_loss.op = -1;
-            batch_loss.right = 0;
+            Value *batch_loss;
+            Value temp;
+            temp.value = 0.0;
+            temp.gradient = 0.0;
+            temp.op = -1;
+            temp.right = 0;
+            temp.children[0] = NULL;
+            temp.children[1] = NULL;
+            batch_loss = &temp;
             for (int d = 0; d < batch_size; d++){
                 int data_index = b * batch_size + d;
                 if (data_index >= data_size) {
@@ -236,16 +255,24 @@ Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_
                 Value prediction = forward(n, &x_val);
                 Value diff = sub_values(&prediction, &y_val);
                 Value loss_term = fabs_value(&diff);
-                batch_loss = add_values(&batch_loss, &loss_term);
+                // printf("  old batch loss in scope: %.4f\n", batch_loss.value);
+                Value next_total_loss = add_values(batch_loss, &loss_term);
+                // printf("  Next Total Loss: %.4f\n", next_total_loss.value);
+                batch_loss = &next_total_loss;
+                // printf("  new batch loss in scope: %.4f\n", batch_loss.value);
             }
-            epoch_loss += batch_loss.value;
+            epoch_loss += batch_loss->value;
 
             Value batch_size_val;
-            batch_size_val.value = batch_size;
+            batch_size_val.value = (double) batch_size;
             batch_size_val.gradient = 0.0;
             batch_size_val.op = -1;
             batch_size_val.right = 0;
-            Value avg_loss = div_values(&batch_loss, &batch_size_val);
+            batch_size_val.children[0] = NULL;
+            batch_size_val.children[1] = NULL;
+            printf("Batch Loss: %.4f\n", batch_loss->value);
+            Value avg_loss = div_values(batch_loss, &batch_size_val);
+            printf("Average Loss: %.4f\n", avg_loss.value);
             backward(&avg_loss, NULL, 1.0);
             accum_count += 1;
             if (accum_count % accum == 0){
@@ -282,18 +309,26 @@ Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_
 int main(){
     Value weight;
     weight.value = 20.0;
-    weight.gradient = 1.0;
+    weight.gradient = 0.0;
+    weight.op = -1;
+    weight.right = 0;
+    weight.children[0] = NULL;
+    weight.children[1] = NULL;
 
     Value bias;
     bias.value = 10.0;
     bias.gradient = 0.0;
+    bias.op = -1;
+    bias.right = 0;
+    bias.children[0] = NULL;
+    bias.children[1] = NULL;
 
     Neuron neuron;
     neuron.weight = weight;
     neuron.bias = bias;
     neuron.lr = 0.025;
 
-    Results result = gradient_descent(&neuron, 1, (DataPoint *) DATA, 10, 3, 1);
+    Results result = gradient_descent(&neuron, 1, (DataPoint *) DATA, 10, 1, 1);
     // Print the results
     printf("Training Results:\n");
     printf("----------------\n");
