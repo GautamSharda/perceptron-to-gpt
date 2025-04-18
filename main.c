@@ -17,7 +17,7 @@ Value* add_values(Value *val_1, Value *val_2){
     val_2->op = 0;
     val_2->right = 1;
     Value *result = (Value*)malloc(sizeof(Value));
-   result->value = val_1->value + val_2->value;
+    result->value = val_1->value + val_2->value;
     result->gradient = 0;
     result->op = -1;
     result->right = 0;
@@ -71,10 +71,6 @@ Value* div_values(Value *val_1, Value *val_2){
 Value* fabs_value(Value *val_1){
     val_1->op = 4;
     Value *result = (Value*)malloc(sizeof(Value));
-    if (result == NULL) {
-        perror("Failed to allocate memory in fabs_value");
-        exit(EXIT_FAILURE);
-    }
     result->value = fabs(val_1->value);
     result->gradient = 0;
     result->op = -1;
@@ -206,9 +202,9 @@ Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_
         batches[b] = batch;
     }
 
-    double epoch_loss = 0.0;
     double *epoch_losses = malloc(epochs*sizeof(double));
     for (int e = 0; e < epochs; e++){
+        double epoch_loss = 0.0;
         int accum_count = 0;
         for (int b = 0; b < num_batches; b++){
             Value *batch_loss;
