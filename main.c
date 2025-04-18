@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-
+//free memory allocated in the value funcs!!
 typedef struct Value {
     double value;
     double gradient;
@@ -12,85 +12,105 @@ typedef struct Value {
 
 // define and use constructor
 
-Value add_values(Value *val_1, Value *val_2){
+Value* add_values(Value *val_1, Value *val_2){
     val_1->op = 0;
     val_2->op = 0;
     val_2->right = 1;
-    Value result;
-    result.value = val_1->value + val_2->value;
-    result.gradient = 0;
-    result.op = -1;
-    result.right = 0;
-    result.children[0] = val_1;
-    result.children[1] = val_2;
+    Value *result = (Value*)malloc(sizeof(Value));
+    if (result == NULL) {
+        perror("Failed to allocate memory in add_values");
+        exit(EXIT_FAILURE);
+    }
+    result->value = val_1->value + val_2->value;
+    result->gradient = 0;
+    result->op = -1;
+    result->right = 0;
+    result->children[0] = val_1;
+    result->children[1] = val_2;
     return result;
 }
 
-Value mul_values(Value *val_1, Value *val_2){
+Value* mul_values(Value *val_1, Value *val_2){
     val_1->op = 1;
     val_2->op = 1;
     val_2->right = 1;
-    Value result;
-    result.value = val_1->value * val_2->value;
-    result.gradient = 0;
-    result.op = -1;
-    result.right = 0;
-    result.children[0] = val_1;
-    result.children[1] = val_2;
+    Value *result = (Value*)malloc(sizeof(Value));
+    if (result == NULL) {
+        perror("Failed to allocate memory in mul_values");
+        exit(EXIT_FAILURE);
+    }
+    result->value = val_1->value * val_2->value;
+    result->gradient = 0;
+    result->op = -1;
+    result->right = 0;
+    result->children[0] = val_1;
+    result->children[1] = val_2;
     return result;
 }
 
-Value sub_values(Value *val_1, Value *val_2){
+Value* sub_values(Value *val_1, Value *val_2){
     val_1->op = 2;
     val_2->op = 2;
     val_2->right = 1;
-    Value result;
-    result.value = val_1->value - val_2->value;
-    result.gradient = 0;
-    result.op = -1;
-    result.right = 0;
-    result.children[0] = val_1;
-    result.children[1] = val_2;
+    Value *result = (Value*)malloc(sizeof(Value));
+    if (result == NULL) {
+        perror("Failed to allocate memory in sub_values");
+        exit(EXIT_FAILURE);
+    }
+    result->value = val_1->value - val_2->value;
+    result->gradient = 0;
+    result->op = -1;
+    result->right = 0;
+    result->children[0] = val_1;
+    result->children[1] = val_2;
     return result;
 }
 
-Value div_values(Value *val_1, Value *val_2){
+Value* div_values(Value *val_1, Value *val_2){
     val_1->op = 3;
     val_2->op = 3;
     val_2->right = 1;
-    Value result;
-    result.value = val_1->value / val_2->value;
-    result.gradient = 0;
-    result.op = -1;
-    result.right = 0;
-    result.children[0] = val_1;
-    result.children[1] = val_2;
+    Value *result = (Value*)malloc(sizeof(Value));
+    if (result == NULL) {
+        perror("Failed to allocate memory in div_values");
+        exit(EXIT_FAILURE);
+    }
+    result->value = val_1->value / val_2->value;
+    result->gradient = 0;
+    result->op = -1;
+    result->right = 0;
+    result->children[0] = val_1;
+    result->children[1] = val_2;
     return result;
 }
 
-Value fabs_value(Value *val_1){
+Value* fabs_value(Value *val_1){
     val_1->op = 4;
-    Value result;
-    result.value = fabs(val_1->value);
-    result.gradient = 0;
-    result.op = -1;
-    result.right = 0;
-    result.children[0] = val_1;
-    result.children[1] = NULL;
+    Value *result = (Value*)malloc(sizeof(Value));
+    if (result == NULL) {
+        perror("Failed to allocate memory in fabs_value");
+        exit(EXIT_FAILURE);
+    }
+    result->value = fabs(val_1->value);
+    result->gradient = 0;
+    result->op = -1;
+    result->right = 0;
+    result->children[0] = val_1;
+    result->children[1] = NULL;
     return result;
 }
 
 void backward(Value *v, Value *other, double chain_rule_grad){
 
     // Safely print children's values, printing NaN if a child is NULL
-    printf("Starting backward pass with value: %.4f, children: %f, %f\n",
+    printf("Starting backward pass with value: %.4f, children: %f (op: %d), %f (op: %d)\n",
            v->value,
            (v->children[0] != NULL) ? v->children[0]->value : NAN, // Check child 0
-           (v->children[1] != NULL) ? v->children[1]->value : NAN  // Check child 1
+           (v->children[0] != NULL) ? v->children[0]->op : -999,   // Print op of child 0
+           (v->children[1] != NULL) ? v->children[1]->value : NAN, // Check child 1
+           (v->children[1] != NULL) ? v->children[1]->op : -999   // Print op of child 1
           );
     // Need #include <math.h> for NAN
-
-    // printf("Operation: %d\n", v->op); // Keep this if useful for debugging the loop
     switch (v->op) {
         // 0 = add, 1 = mul, 2 = sub, 3 = div, 4 = abs
         case 0:
@@ -120,8 +140,7 @@ void backward(Value *v, Value *other, double chain_rule_grad){
             v->gradient += 1.0;
             break;
     }
-
-    if (v->children[0] != NULL) {
+   if (v->children[0] != NULL) {
         backward(v->children[0], v->children[1], v->gradient);
     }
     if (v->children[1] != NULL) {
@@ -135,9 +154,9 @@ typedef struct{
     double lr;
 } Neuron;
 
-Value forward(Neuron *neuron, Value *x){
-    Value mul_result = mul_values(&neuron->weight, x);
-    return add_values(&mul_result, &neuron->bias);
+Value* forward(Neuron *neuron, Value *x){
+    Value *mul_result = mul_values(&neuron->weight, x);
+    return add_values(mul_result, &neuron->bias);
 }
 
 void descend(Neuron *n){
@@ -252,13 +271,13 @@ Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_
                 y_val.op = -1;
                 y_val.right = 0;
 
-                Value prediction = forward(n, &x_val);
-                Value diff = sub_values(&prediction, &y_val);
-                Value loss_term = fabs_value(&diff);
+                Value *prediction = forward(n, &x_val);
+                Value *diff = sub_values(prediction, &y_val);
+                Value *loss_term = fabs_value(diff);
                 // printf("  old batch loss in scope: %.4f\n", batch_loss.value);
-                Value next_total_loss = add_values(batch_loss, &loss_term);
+                Value *next_total_loss = add_values(batch_loss, loss_term);
                 // printf("  Next Total Loss: %.4f\n", next_total_loss.value);
-                batch_loss = &next_total_loss;
+                batch_loss = next_total_loss;
                 // printf("  new batch loss in scope: %.4f\n", batch_loss.value);
             }
             epoch_loss += batch_loss->value;
@@ -271,9 +290,9 @@ Results gradient_descent(Neuron *n, int epochs, DataPoint *data_array, int data_
             batch_size_val.children[0] = NULL;
             batch_size_val.children[1] = NULL;
             printf("Batch Loss: %.4f\n", batch_loss->value);
-            Value avg_loss = div_values(batch_loss, &batch_size_val);
-            printf("Average Loss: %.4f\n", avg_loss.value);
-            backward(&avg_loss, NULL, 1.0);
+            Value *avg_loss = div_values(batch_loss, &batch_size_val);
+            printf("Average Loss: %.4f\n", avg_loss->value);
+            backward(avg_loss, NULL, 1.0);
             accum_count += 1;
             if (accum_count % accum == 0){
                 descend(n);
@@ -328,7 +347,7 @@ int main(){
     neuron.bias = bias;
     neuron.lr = 0.025;
 
-    Results result = gradient_descent(&neuron, 1, (DataPoint *) DATA, 10, 1, 1);
+    Results result = gradient_descent(&neuron, 72, (DataPoint *) DATA, 10, 1, 1);
     // Print the results
     printf("Training Results:\n");
     printf("----------------\n");
