@@ -1,3 +1,4 @@
+// Multiblock MatMul with flattened Matrices.
 #include <stdio.h>
 #include <cuda_runtime.h>
 
