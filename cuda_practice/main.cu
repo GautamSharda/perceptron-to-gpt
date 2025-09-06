@@ -17,7 +17,7 @@ __host__ void matmul_kernel_cpu(float* Md, float* Nd, float* Pd, int Width){
                 float c = Nd[k*Width + j]; // column-wise for the second matrix
                 dp += r*c; // summate the products
             }
-            // dp contains the dot product of the 2 vectors, place in result matrix
+            // place dot product in result matrix
             Pd[i*Width + j] = dp; // at the ith row and jth col.
         }
     }
@@ -32,11 +32,11 @@ __host__ void matmul_kernel_cpu(float* Md, float* Nd, float* Pd, int Width){
     }
 }
 
-__global__ void matmul_kernel_gpu(float* Md, float* Nd, float* Pd, int Width){
+__global__ void matmul_kernel_gpu_singleblock(float* Md, float* Nd, float* Pd, int Width){
     // This will be one of the threads in the thread block -- specifically at the following
     // These correspond to the row / column in the Md and Nd matrices
     int i = threadIdx.x; // This is the col in Pd (and therefore also in Nd)
-    int j = threadIdx.y; // This is the row in Pd (and therefore also in Pd)
+    int j = threadIdx.y; // This is the row in Pd (and therefore also in Md)
     float dp = 0.0f;
     for (int k = 0; k < Width; k++){ // k remains the column in Md and row in Nd
         // Applying index = row*width + col
@@ -48,10 +48,19 @@ __global__ void matmul_kernel_gpu(float* Md, float* Nd, float* Pd, int Width){
 }
 
 __global__ void matmul_kernel_gpu_multiblock(float* Md, float* Nd, float* Pd, int Width){
-    // ONLY DOING 1 DOT PRODUCT! --> We only need 1 loop, because we are NOT iterating through vectors.
-    // --> Select the vector using: BlockDim, BlockIdx (x, y), ThreadIdx (x, y, z) 
-    float dp = 0.0f;
-    // STRUGGLING
+    // Don't assume any specific Width, but assume it's greater than BlockDim.x == BlockDim.y --> Multiple blocks == (GridDim =/= 1x1)
+    // --> Tiling --> Bounds checking! 
+    int row = blockIdx.y*blockDim.y + threadIdx.y; // Global Thread ID, which can be used for indexing. Specifically, this is the row in Pd (and therefore also in Md).
+    int col = blockIdx.x*blockDim.x + threadIdx.x; // Global Thread ID, which can be used for indexing. Specifically, this is the col in Pd (and therefore also in Nd).
+    if (row < Width && col < Width){ // Skip if out of bounds
+        float dp = 0.0f;
+        for (int k = 0; k < Width; k++){ // For indexing within the vectors. This is a col in Md and a row in Nd. 
+            // indexing in flattened matrix: flat_index = row_of_element_in_OG_Matrix*width_of_Matrix + col_of_element_in_OG_matrix (!) i.e., index = row*width + col
+            dp += Md[row*Width + k] * Nd[k*Width + col];
+        }
+        // Again, same indexing strategy. If you name every variable appropriately and understand what it represents, this becomes clear.
+        Pd[row*Width + col] = dp;
+    }
 }
 
 void matmul(float* M, float* N, float* P, int Width){
@@ -73,10 +82,9 @@ void matmul(float* M, float* N, float* P, int Width){
     // matmul_kernel_cpu(M, N, P, Width); // CPU version
     dim3 dimBlock(2, 2);
     dim3 dimGrid(1, 1);
-    matmul_kernel_gpu<<<dimGrid, dimBlock>>>(Md, Nd, Pd, Width); // GPU version
+    matmul_kernel_gpu_multiblock<<<dimGrid, dimBlock>>>(Md, Nd, Pd, Width); // GPU version
     // Free the previously allocated device memory
     cudaMemcpy(P, Pd, sizeP, cudaMemcpyDeviceToHost);
-
     // Print the matrix P from the host right after copying it back from the device.
     printf("\nResult Matrix P (from matmul, after GPU computation):\n");
     for(int i = 0; i < Width; i++) {
