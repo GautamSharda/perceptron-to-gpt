@@ -6,3 +6,15 @@ __pycache__/
 compute_graph.png
 # Output directory
 out/
+
+# macOS metadata
+.DS_Store
+
+# Native build outputs
+*.o
+*.out
+*.exe
+*.so
+*.dylib
+*.dSYM/
+/m
